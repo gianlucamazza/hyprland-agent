@@ -12,7 +12,12 @@ from agent.schemas import Window, Monitor, Workspace
 
 
 def _socket_path(name: str) -> str:
-    sig = os.environ["HYPRLAND_INSTANCE_SIGNATURE"]
+    sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if not sig:
+        raise RuntimeError(
+            "HYPRLAND_INSTANCE_SIGNATURE not set — is Hyprland running? "
+            "Run 'agent doctor' for diagnostics."
+        )
     runtime = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
     return f"{runtime}/hypr/{sig}/{name}"
 

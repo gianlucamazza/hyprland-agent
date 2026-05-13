@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS runs (
     dry_run    INTEGER NOT NULL,
     status     TEXT NOT NULL,
     started_at REAL NOT NULL,
-    ended_at   REAL
+    ended_at   REAL,
+    error_text TEXT
 );
 
 CREATE TABLE IF NOT EXISTS run_events (
@@ -63,6 +64,11 @@ class RunStore:
 
     def _init_db(self, conn: sqlite3.Connection) -> None:
         conn.executescript(_SCHEMA)
+        # Migration: add error_text column to existing databases
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
+        if "error_text" not in cols:
+            conn.execute("ALTER TABLE runs ADD COLUMN error_text TEXT")
+            conn.commit()
 
     async def close(self) -> None:
         pass  # connections are per-call; nothing to close
@@ -96,10 +102,13 @@ class RunStore:
         run_id: str,
         status: RunStatus,
         ended_at: float | None = None,
+        error: str | None = None,
     ) -> None:
         async with self._lock:
             ended = ended_at if ended_at is not None else time.time()
-            await self._run_sync(self._do_update_status, run_id, status.value, ended)
+            await self._run_sync(
+                self._do_update_status, run_id, status.value, ended, error
+            )
             self._lru.pop(run_id, None)  # invalidate cache entry
 
     def _do_update_status(
@@ -108,10 +117,11 @@ class RunStore:
         run_id: str,
         status: str,
         ended_at: float,
+        error: str | None,
     ) -> None:
         conn.execute(
-            "UPDATE runs SET status=?, ended_at=? WHERE run_id=?",
-            (status, ended_at, run_id),
+            "UPDATE runs SET status=?, ended_at=?, error_text=? WHERE run_id=?",
+            (status, ended_at, error, run_id),
         )
         conn.commit()
 
@@ -150,7 +160,7 @@ class RunStore:
     def _do_list_runs(self, conn: sqlite3.Connection, limit: int) -> list[sqlite3.Row]:
         conn.row_factory = sqlite3.Row
         return conn.execute(
-            "SELECT run_id, task, brain, dry_run, status, started_at, ended_at"
+            "SELECT run_id, task, brain, dry_run, status, started_at, ended_at, error_text"
             " FROM runs ORDER BY started_at DESC LIMIT ?",
             (limit,),
         ).fetchall()
@@ -179,7 +189,7 @@ class RunStore:
     ) -> tuple[sqlite3.Row, list[sqlite3.Row]] | None:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT run_id, task, brain, dry_run, status, started_at, ended_at"
+            "SELECT run_id, task, brain, dry_run, status, started_at, ended_at, error_text"
             " FROM runs WHERE run_id=?",
             (run_id,),
         ).fetchone()
@@ -206,6 +216,7 @@ class RunStore:
             status=RunStatus(row["status"]),
             started_at=row["started_at"],
             ended_at=row["ended_at"],
+            error=row["error_text"],
         )
 
     @staticmethod

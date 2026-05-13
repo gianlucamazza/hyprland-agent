@@ -128,18 +128,30 @@ class RunExecutor:
     ) -> None:
         from agent.orchestrator import run as _orchestrate
 
+        _RUN_TIMEOUT = 300.0  # 5 minutes hard cap
+
         try:
-            await _orchestrate(task, brain, dry_run=dry_run, ctx=ctx)
+            await asyncio.wait_for(
+                _orchestrate(task, brain, dry_run=dry_run, ctx=ctx),
+                timeout=_RUN_TIMEOUT,
+            )
             await self._store.update_run_status(run_id, RunStatus.completed)
             await self._publish(run_id, "run_completed", {})
             log.info("Run %s completed", run_id)
+        except asyncio.TimeoutError:
+            msg = f"Run timed out after {int(_RUN_TIMEOUT)}s"
+            await self._store.update_run_status(run_id, RunStatus.errored, error=msg)
+            await self._publish(run_id, "run_errored", {"error": msg})
+            log.error("Run %s timed out", run_id)
         except asyncio.CancelledError:
             await self._store.update_run_status(run_id, RunStatus.aborted)
             await self._publish(run_id, "run_aborted", {})
             log.info("Run %s aborted", run_id)
             raise
         except Exception as exc:
-            await self._store.update_run_status(run_id, RunStatus.errored)
+            await self._store.update_run_status(
+                run_id, RunStatus.errored, error=str(exc)
+            )
             await self._publish(run_id, "run_errored", {"error": str(exc)})
             log.error("Run %s errored: %s", run_id, exc)
         finally:

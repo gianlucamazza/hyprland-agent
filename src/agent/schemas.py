@@ -170,6 +170,7 @@ class RunSummary(BaseModel):
     status: RunStatus
     started_at: float
     ended_at: float | None = None
+    error: str | None = None
 
 
 class RunRecord(RunSummary):

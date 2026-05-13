@@ -73,4 +73,11 @@ async def run_watcher(state) -> None:  # type: ignore[type-arg]
         for rule in snapshot:
             if match_event(rule, event):
                 log.debug("Rule matched: %s on %s", rule.on.value, event.data)
-                asyncio.create_task(execute_rule(rule, event))
+                task = asyncio.create_task(execute_rule(rule, event))
+                task.add_done_callback(
+                    lambda t: (
+                        log.error("Rule execution failed: %s", t.exception())
+                        if not t.cancelled() and t.exception()
+                        else None
+                    )
+                )

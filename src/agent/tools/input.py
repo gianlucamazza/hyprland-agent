@@ -29,6 +29,42 @@ _MODIFIERS = {
     "meta": "super",
 }
 
+# LLM-friendly aliases → X11/wtype key names
+_KEY_NAMES: dict[str, str] = {
+    "enter": "Return",
+    "return": "Return",
+    "tab": "Tab",
+    "escape": "Escape",
+    "esc": "Escape",
+    "backspace": "BackSpace",
+    "delete": "Delete",
+    "del": "Delete",
+    "space": "space",
+    "up": "Up",
+    "down": "Down",
+    "left": "Left",
+    "right": "Right",
+    "home": "Home",
+    "end": "End",
+    "pageup": "Prior",
+    "page_up": "Prior",
+    "pagedown": "Next",
+    "page_down": "Next",
+    "insert": "Insert",
+    "f1": "F1",
+    "f2": "F2",
+    "f3": "F3",
+    "f4": "F4",
+    "f5": "F5",
+    "f6": "F6",
+    "f7": "F7",
+    "f8": "F8",
+    "f9": "F9",
+    "f10": "F10",
+    "f11": "F11",
+    "f12": "F12",
+}
+
 
 def _build_key_args(combo: str) -> list[str]:
     """Build wtype argument list for a key combo like 'ctrl+shift+c'."""
@@ -39,7 +75,8 @@ def _build_key_args(combo: str) -> list[str]:
         mod = _MODIFIERS.get(part, part)
         args += ["-M", mod]
         held.append(mod)
-    args += ["-P", parts[-1]]
+    key = _KEY_NAMES.get(parts[-1], parts[-1])
+    args += ["-P", key]
     for mod in reversed(held):
         args += ["-m", mod]
     return args

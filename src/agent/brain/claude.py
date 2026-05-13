@@ -14,6 +14,7 @@ from agent.tools import hypr, screen
 _DEFAULT_MODEL = "claude-opus-4-7"
 _MAX_TOKENS = 4096
 _SCALE = 0.5  # screenshot resize factor; coordinates are scaled back up before dispatch
+_MAX_LOOP = 20  # max tool-use iterations per decide() call
 
 _CUSTOM_TOOLS: list[dict[str, Any]] = [
     {
@@ -176,7 +177,7 @@ class ClaudeBrain:
         tools = [_computer_tool(scaled_w, scaled_h)] + _CUSTOM_TOOLS
         all_actions: list[Action] = []
 
-        while True:
+        for _iteration in range(_MAX_LOOP):
             response = await asyncio.to_thread(
                 client.messages.create,
                 model=self.model,
@@ -238,5 +239,11 @@ class ClaudeBrain:
 
             messages.append({"role": "assistant", "content": response.content})
             messages.append({"role": "user", "content": tool_results})
+        else:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Brain loop reached max iterations (%d) — stopping", _MAX_LOOP
+            )
 
         return all_actions

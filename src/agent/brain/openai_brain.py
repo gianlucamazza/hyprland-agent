@@ -18,6 +18,7 @@ from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
 
 _SCALE = 0.5  # screenshot resize factor; coordinates scaled back up before dispatch
+_MAX_LOOP = 20  # max tool-use iterations per decide() call
 
 
 @dataclass(frozen=True)
@@ -185,7 +186,7 @@ _TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "key",
-            "description": "Press a key combination, e.g. 'ctrl+c'.",
+            "description": "Press a key combination (e.g. 'ctrl+c', 'Return', 'Tab', 'Escape', 'BackSpace', 'super+l').",
             "parameters": {
                 "type": "object",
                 "properties": {"combo": {"type": "string"}},
@@ -358,7 +359,7 @@ class OpenAICompatibleBrain:
         ]
         all_actions: list[Action] = []
 
-        while True:
+        for _iteration in range(_MAX_LOOP):
             response = await self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
@@ -387,5 +388,11 @@ class OpenAICompatibleBrain:
                     }
                 )
             messages.extend(tool_results)
+        else:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Brain loop reached max iterations (%d) — stopping", _MAX_LOOP
+            )
 
         return all_actions
