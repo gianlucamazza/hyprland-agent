@@ -25,8 +25,12 @@ def get_brain(override: str | None = None, dry_run: bool = False) -> Brain:
     """
     override: 'claude' | 'openai' | 'gpt' | 'kimi' | 'moonshot' | 'k2' |
               'groq' | 'together' | 'zai' | 'glm' | 'qwen' | 'dashscope' | 'auto' | None
-    auto: defaults to Claude (computer-use is most capable for desktop control).
+    auto: first OpenAI-compatible provider with API key set (registry order:
+    openai, moonshot, groq, together, zai, qwen). Falls back to Claude only
+    if no OpenAI-compat key is configured.
     """
+    import os
+
     choice = (override or "auto").lower()
 
     if choice in _ALIASES:
@@ -39,7 +43,13 @@ def get_brain(override: str | None = None, dry_run: bool = False) -> Brain:
 
         return ClaudeBrain(dry_run=dry_run)
 
-    # auto
+    # auto: first configured OpenAI-compat provider, else Claude fallback
+    from agent.brain.openai_brain import PROVIDERS, build_brain
+
+    for key, cfg in PROVIDERS.items():
+        if os.environ.get(cfg.key_env, "").strip():
+            return build_brain(key)
+
     from agent.brain.claude import ClaudeBrain
 
     return ClaudeBrain(dry_run=dry_run)

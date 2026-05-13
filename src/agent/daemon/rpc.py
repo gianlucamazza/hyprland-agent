@@ -17,7 +17,7 @@ Handler = Any  # async def(state, params) -> dict
 
 async def _run_task(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
     task = params.get("task", "")
-    brain = params.get("brain", "claude")
+    brain = params.get("brain", "auto")
     dry_run = bool(params.get("dry_run", False))
     if not task:
         raise ValueError("task must be a non-empty string")

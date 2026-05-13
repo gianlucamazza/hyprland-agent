@@ -22,7 +22,7 @@ _BrainOpt = Annotated[
     typer.Option(
         "--brain",
         "-b",
-        help="Brain: claude | openai | kimi | groq | together | zai | qwen | auto",
+        help="Brain: openai | kimi | groq | together | zai | qwen | claude | auto (default: first configured OpenAI-compat, else claude)",
     ),
 ]
 
@@ -70,7 +70,7 @@ def run(
         async with connect(SOCKET_PATH) as c:
             result = await c.request(
                 RpcMethod.run_task,
-                {"task": task, "brain": brain or "claude", "dry_run": dry_run},
+                {"task": task, "brain": brain or "auto", "dry_run": dry_run},
             )
             typer.echo(result.get("run_id", ""))
 
@@ -93,7 +93,7 @@ def dry_run_cmd(
         async with connect(SOCKET_PATH) as c:
             result = await c.request(
                 RpcMethod.run_task,
-                {"task": task, "brain": brain or "claude", "dry_run": True},
+                {"task": task, "brain": brain or "auto", "dry_run": True},
             )
             typer.echo(result.get("run_id", ""))
 
