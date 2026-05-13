@@ -1,0 +1,71 @@
+"""Input control: wtype (keyboard) + ydotool (mouse via uinput)."""
+
+from __future__ import annotations
+
+import asyncio
+import shlex
+
+
+async def _run(*cmd: str) -> None:
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, err = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"{cmd[0]} failed: {err.decode()}")
+
+
+async def type_text(text: str) -> None:
+    await _run("wtype", "--", text)
+
+
+_MODIFIERS = {
+    "ctrl": "ctrl",
+    "shift": "shift",
+    "alt": "alt",
+    "super": "super",
+    "meta": "super",
+}
+
+
+def _build_key_args(combo: str) -> list[str]:
+    """Build wtype argument list for a key combo like 'ctrl+shift+c'."""
+    parts = combo.lower().split("+")
+    args: list[str] = []
+    held: list[str] = []
+    for part in parts[:-1]:
+        mod = _MODIFIERS.get(part, part)
+        args += ["-M", mod]
+        held.append(mod)
+    args += ["-P", parts[-1]]
+    for mod in reversed(held):
+        args += ["-m", mod]
+    return args
+
+
+async def key(combo: str) -> None:
+    """Send a key combination, e.g. 'ctrl+c', 'super+shift+4'."""
+    await _run("wtype", *_build_key_args(combo))
+
+
+async def move(x: int, y: int) -> None:
+    await _run("ydotool", "mousemove", "--absolute", "-x", str(x), "-y", str(y))
+
+
+async def click(button: str = "left") -> None:
+    codes = {"left": "0xC0", "right": "0xC1", "middle": "0xC2"}
+    code = codes.get(button, "0xC0")
+    await _run("ydotool", "click", code)
+
+
+async def move_and_click(x: int, y: int, button: str = "left") -> None:
+    await move(x, y)
+    await asyncio.sleep(0.05)
+    await click(button)
+
+
+async def scroll(amount: int, horizontal: bool = False) -> None:
+    axis = "1" if horizontal else "0"
+    await _run("ydotool", "mousemove", "--wheel", axis, str(amount))

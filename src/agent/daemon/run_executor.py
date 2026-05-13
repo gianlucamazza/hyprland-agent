@@ -1,0 +1,146 @@
+"""Task queue, lifecycle management, and RunContext for agent runs."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable
+
+from agent.daemon.audit_log import AuditLog
+from agent.daemon.pubsub import PubSub
+from agent.daemon.store import RunStore
+from agent.ipc.protocol import Topic
+from agent.schemas import RunEventRecord, RunStatus, RunSummary
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class RunContext:
+    """Injected into orchestrator.run() to decouple it from storage."""
+
+    run_id: str
+    _emit_fn: Callable[[str, dict[str, Any]], Awaitable[None]] = field(repr=False)
+
+    async def emit(self, kind: str, payload: dict[str, Any] | None = None) -> None:
+        await self._emit_fn(kind, payload or {})
+
+
+class RunExecutor:
+    """Manages concurrent agent runs: submit, cancel, track lifecycle."""
+
+    def __init__(self, store: RunStore, pubsub: PubSub, audit: AuditLog) -> None:
+        self._store = store
+        self._pubsub = pubsub
+        self._audit = audit
+        self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._seq: dict[str, int] = {}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    async def submit(self, task: str, brain_name: str, dry_run: bool) -> str:
+        """Start a run asynchronously. Returns the run_id immediately."""
+        from agent.brain.router import get_brain
+
+        run_id = str(uuid.uuid4())
+        summary = RunSummary(
+            run_id=run_id,
+            task=task,
+            brain=brain_name,
+            dry_run=dry_run,
+            status=RunStatus.running,
+            started_at=time.time(),
+        )
+        await self._store.insert_run(summary)
+        self._seq[run_id] = 0
+
+        brain = get_brain(brain_name, dry_run=dry_run)
+        ctx = RunContext(run_id=run_id, _emit_fn=self._make_emit(run_id))
+
+        t = asyncio.create_task(self._run_task(run_id, task, brain, dry_run, ctx))
+        self._tasks[run_id] = t
+        t.add_done_callback(lambda _: self._tasks.pop(run_id, None))
+
+        await self._publish(run_id, "run_started", {"task": task, "brain": brain_name})
+        log.info(
+            "Run %s started (task=%r brain=%s dry=%s)",
+            run_id,
+            task,
+            brain_name,
+            dry_run,
+        )
+        return run_id
+
+    async def cancel(self, run_id: str) -> bool:
+        task = self._tasks.get(run_id)
+        if task is None or task.done():
+            return False
+        task.cancel()
+        return True
+
+    async def active_run_ids(self) -> list[str]:
+        return [rid for rid, t in self._tasks.items() if not t.done()]
+
+    async def close(self) -> None:
+        """Cancel all running tasks and wait for them to finish."""
+        for task in list(self._tasks.values()):
+            task.cancel()
+        if self._tasks:
+            await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    def _make_emit(
+        self, run_id: str
+    ) -> Callable[[str, dict[str, Any]], Awaitable[None]]:
+        async def _emit(kind: str, payload: dict[str, Any]) -> None:
+            seq = self._seq.get(run_id, 0)
+            self._seq[run_id] = seq + 1
+            event = RunEventRecord(seq=seq, ts=time.time(), kind=kind, payload=payload)
+            await self._store.append_event(run_id, event)
+            await self._audit.write(
+                {"run_id": run_id, "seq": seq, "kind": kind, **payload}
+            )
+            await self._publish(run_id, kind, payload)
+
+        return _emit
+
+    async def _publish(self, run_id: str, kind: str, payload: dict[str, Any]) -> None:
+        await self._pubsub.publish(
+            Topic.runs,
+            {"run_id": run_id, "kind": kind, **payload},
+        )
+
+    async def _run_task(
+        self,
+        run_id: str,
+        task: str,
+        brain: Any,
+        dry_run: bool,
+        ctx: RunContext,
+    ) -> None:
+        from agent.orchestrator import run as _orchestrate
+
+        try:
+            await _orchestrate(task, brain, dry_run=dry_run, ctx=ctx)
+            await self._store.update_run_status(run_id, RunStatus.completed)
+            await self._publish(run_id, "run_completed", {})
+            log.info("Run %s completed", run_id)
+        except asyncio.CancelledError:
+            await self._store.update_run_status(run_id, RunStatus.aborted)
+            await self._publish(run_id, "run_aborted", {})
+            log.info("Run %s aborted", run_id)
+            raise
+        except Exception as exc:
+            await self._store.update_run_status(run_id, RunStatus.errored)
+            await self._publish(run_id, "run_errored", {"error": str(exc)})
+            log.error("Run %s errored: %s", run_id, exc)
+        finally:
+            self._seq.pop(run_id, None)

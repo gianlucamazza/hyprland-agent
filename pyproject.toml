@@ -1,0 +1,37 @@
+[project]
+name = "hyprland-agent"
+version = "0.1.0"
+description = "Agentic desktop controller for Hyprland / Wayland"
+requires-python = ">=3.13"
+dependencies = [
+  "anthropic>=0.101.0",
+  "openai>=2.36.0",
+  "pillow>=12.2.0",
+  "pydantic>=2.13.4",
+  "pyyaml>=6.0.3",
+  "textual>=0.85.0",
+  "typer>=0.25.1",
+]
+
+[project.scripts]
+agent = "agent.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent"]
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24",
+    "pytest-textual-snapshot>=0.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
