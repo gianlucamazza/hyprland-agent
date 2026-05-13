@@ -364,7 +364,7 @@ class OpenAICompatibleBrain:
                 messages=messages,
                 tools=_TOOLS,
                 tool_choice="auto",
-                max_tokens=2048,
+                max_completion_tokens=2048,
             )
             msg = response.choices[0].message
             messages.append(msg)
