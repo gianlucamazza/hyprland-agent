@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from agent.daemon.state import AppState
@@ -11,6 +12,11 @@ from agent.ipc.protocol import RpcMethod, make_error_response, make_ok_response
 from agent.ipc.protocol import ResponseFrame
 
 log = logging.getLogger(__name__)
+
+try:
+    _APP_VERSION = version("hyprland-agent")
+except PackageNotFoundError:
+    _APP_VERSION = "0.0.0+local"
 
 Handler = Any  # async def(state, params) -> dict
 
@@ -89,7 +95,7 @@ async def _disarm_killswitch(state: AppState, params: dict[str, Any]) -> dict[st
 async def _daemon_status(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
     active = await state.executor.active_run_ids()
     return {
-        "version": "0.2.0",
+        "version": _APP_VERSION,
         "uptime_s": time.time() - state.start_time,
         "active_runs": active,
         "rules_count": len(state.rules),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from agent.daemon import rpc
 from agent.daemon.rpc import _DISPATCH
 from agent.ipc.protocol import RpcMethod
 
@@ -23,3 +24,21 @@ def test_no_extra_handlers() -> None:
 def test_all_handlers_are_callable() -> None:
     for method, handler in _DISPATCH.items():
         assert callable(handler), f"Handler for {method} is not callable"
+
+
+@pytest.mark.asyncio
+async def test_daemon_status_uses_package_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Executor:
+        async def active_run_ids(self) -> list[str]:
+            return []
+
+    class State:
+        executor = Executor()
+        start_time = 1.0
+        rules: list[object] = []
+
+    monkeypatch.setattr(rpc, "_APP_VERSION", "9.9.9")
+
+    result = await rpc._daemon_status(State(), {})
+
+    assert result["version"] == "9.9.9"
