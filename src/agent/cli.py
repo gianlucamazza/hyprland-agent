@@ -22,7 +22,7 @@ _BrainOpt = Annotated[
     typer.Option(
         "--brain",
         "-b",
-        help="Brain: openai | kimi | groq | together | zai | qwen | claude | auto (default: first configured OpenAI-compat, else claude)",
+        help="Brain: auto | claude | openai | kimi | groq | together | zai | qwen (default/configurable via config.yaml)",
     ),
 ]
 
@@ -314,6 +314,7 @@ ExecStart={agent_bin} daemon
 Restart=on-failure
 RestartSec=5
 Environment=PATH={Path.home()}/.local/bin:/usr/local/bin:/usr/bin
+EnvironmentFile=-%h/.config/hyprland-agent/env
 
 [Install]
 WantedBy=graphical-session.target

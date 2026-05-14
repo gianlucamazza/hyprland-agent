@@ -96,11 +96,23 @@ def _hyprland_env() -> Check:
 
 
 def _oauth_creds() -> Check:
+    from agent.config import ConfigError, load_config
+
+    try:
+        config = load_config()
+    except ConfigError:
+        return Check("Claude OAuth", Status.warn, "skipped due to invalid provider config")
+    if not config.brain.is_enabled("claude"):
+        return Check("Claude OAuth", Status.warn, "disabled by provider config")
+
     path = Path.home() / ".claude" / ".credentials.json"
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "").strip():
+        return Check("Claude OAuth", Status.ok, "CLAUDE_CODE_OAUTH_TOKEN set")
     if not path.exists():
+        status = Status.fail if "claude" in config.brain.auto_order else Status.warn
         return Check(
             "Claude OAuth",
-            Status.fail,
+            status,
             "~/.claude/.credentials.json not found",
             "Log in via Claude Code first",
         )
@@ -126,6 +138,15 @@ def _oauth_creds() -> Check:
 
 
 def _anthropic_model() -> Check:
+    from agent.config import ConfigError, load_config
+
+    try:
+        config = load_config()
+    except ConfigError:
+        return Check("ANTHROPIC_MODEL", Status.warn, "skipped due to invalid provider config")
+    if not config.brain.is_enabled("claude"):
+        return Check("ANTHROPIC_MODEL", Status.warn, "disabled by provider config")
+
     model = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-7")
     if model == "claude-opus-4-7":
         return Check(
@@ -143,10 +164,25 @@ def _anthropic_model() -> Check:
 
 
 def _provider_checks() -> list[Check]:
+    from agent.config import ConfigError, load_config
     from agent.brain.openai_brain import PROVIDERS
 
+    try:
+        config = load_config()
+    except ConfigError:
+        return [
+            Check(
+                "provider credentials",
+                Status.warn,
+                "skipped due to invalid provider config",
+            )
+        ]
     out: list[Check] = []
     for cfg in PROVIDERS.values():
+        provider_key = next(key for key, item in PROVIDERS.items() if item == cfg)
+        if not config.brain.is_enabled(provider_key):
+            out.append(Check(cfg.key_env, Status.warn, "disabled by provider config"))
+            continue
         has_key = bool(os.environ.get(cfg.key_env))
         model = os.environ.get(cfg.model_env, cfg.default_model)
         if has_key:
@@ -159,6 +195,38 @@ def _provider_checks() -> list[Check]:
                 )
             )
     return out
+
+
+def _brain_config_checks() -> list[Check]:
+    from agent.config import ConfigError, load_config
+
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        return [
+            Check(
+                "provider config",
+                Status.fail,
+                str(exc),
+                "Edit ~/.config/hyprland-agent/config.yaml",
+            )
+        ]
+
+    enabled = [name for name in config.brain.auto_order if config.brain.is_enabled(name)]
+    config_message = (
+        str(config.path) if config.path.exists() else f"defaults; {config.path} not found"
+    )
+    return [
+        Check("provider config", Status.ok, config_message),
+        Check("brain.default", Status.ok, config.brain.default),
+        Check("brain.auto_order", Status.ok, ", ".join(config.brain.auto_order)),
+        Check(
+            "brain.enabled",
+            Status.ok if enabled else Status.fail,
+            ", ".join(enabled) or "no providers enabled",
+            "Enable at least one provider in config.yaml" if not enabled else "",
+        ),
+    ]
 
 
 def _allowlist() -> Check:
@@ -212,6 +280,7 @@ def run_all() -> list[Check]:
         _uinput_group(),
         _uinput_writable(),
         _hyprland_env(),
+        *_brain_config_checks(),
         _oauth_creds(),
         _anthropic_model(),
         *_provider_checks(),
