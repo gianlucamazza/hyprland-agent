@@ -77,6 +77,7 @@ class Event(BaseModel):
 
 class ActionKind(str, Enum):
     screenshot = "screenshot"
+    terminal_command = "terminal_command"
     type_text = "type_text"
     key = "key"
     mouse_move = "mouse_move"
@@ -155,6 +156,11 @@ class RunStatus(str, Enum):
     aborted = "aborted"
 
 
+class RunKind(str, Enum):
+    run = "run"
+    plan = "plan"
+
+
 class RunEventRecord(BaseModel):
     seq: int
     ts: float
@@ -164,9 +170,9 @@ class RunEventRecord(BaseModel):
 
 class RunSummary(BaseModel):
     run_id: str
+    kind: RunKind = RunKind.run
     task: str
     brain: str
-    dry_run: bool
     status: RunStatus
     started_at: float
     ended_at: float | None = None

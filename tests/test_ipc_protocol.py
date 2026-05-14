@@ -206,6 +206,7 @@ def test_make_error_response() -> None:
 
 def test_all_rpc_methods_have_values() -> None:
     expected = {
+        "plan_task",
         "run_task",
         "cancel_run",
         "list_runs",

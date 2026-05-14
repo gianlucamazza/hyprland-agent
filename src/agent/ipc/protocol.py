@@ -11,6 +11,7 @@ from agent.ipc.constants import PROTOCOL_MAJOR
 
 
 class RpcMethod(str, Enum):
+    plan_task = "plan_task"
     run_task = "run_task"
     cancel_run = "cancel_run"
     list_runs = "list_runs"
