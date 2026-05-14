@@ -31,6 +31,7 @@ class RunList(DataTable):
 
     def on_mount(self) -> None:
         self.add_column("ID", key="run_id", width=8)
+        self.add_column("Kind", key="kind", width=4)
         self.add_column("Status", key="status", width=10)
         self.add_column("Brain", key="brain", width=8)
         self.add_column("Task", key="task")
@@ -48,6 +49,7 @@ class RunList(DataTable):
         style = _STATUS_STYLE.get(status, "")
         self.add_row(
             run_id[:8],
+            r.get("kind", "run"),
             f"[{style}]{status}[/{style}]" if style else status,
             r.get("brain", "?"),
             r.get("task", "")[:60],
@@ -58,20 +60,31 @@ class RunList(DataTable):
         payload = msg.payload
         kind = payload.get("kind", "")
         run_id = payload.get("run_id", "")
-        if kind == "run_started":
+        if kind in ("run_started", "plan_started"):
             self._add_run(
                 {
                     "run_id": run_id,
+                    "kind": payload.get("entry_kind", "run"),
                     "status": "running",
                     "brain": payload.get("brain", "?"),
                     "task": payload.get("task", ""),
                 }
             )
-        elif kind in ("run_completed", "run_aborted", "run_errored"):
+        elif kind in (
+            "run_completed",
+            "run_aborted",
+            "run_errored",
+            "plan_completed",
+            "plan_aborted",
+            "plan_errored",
+        ):
             _map = {
                 "run_completed": "completed",
                 "run_aborted": "aborted",
                 "run_errored": "errored",
+                "plan_completed": "completed",
+                "plan_aborted": "aborted",
+                "plan_errored": "errored",
             }
             new_status = _map[kind]
             style = _STATUS_STYLE.get(new_status, "")

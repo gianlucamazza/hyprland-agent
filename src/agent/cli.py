@@ -57,7 +57,6 @@ def _run(coro) -> None:
 def run(
     task: Annotated[str, typer.Argument(help="Natural-language task description")],
     brain: _BrainOpt = None,
-    dry_run: Annotated[bool, typer.Option("--dry-run", "-n")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
     """Execute a task on the desktop (via daemon)."""
@@ -70,20 +69,20 @@ def run(
         async with connect(SOCKET_PATH) as c:
             result = await c.request(
                 RpcMethod.run_task,
-                {"task": task, "brain": brain or "auto", "dry_run": dry_run},
+                {"task": task, "brain": brain or "auto"},
             )
             typer.echo(result.get("run_id", ""))
 
     _run(_do())
 
 
-@app.command(name="dry-run")
-def dry_run_cmd(
+@app.command(name="plan")
+def plan_cmd(
     task: Annotated[str, typer.Argument(help="Natural-language task description")],
     brain: _BrainOpt = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
-    """Plan actions without executing them (safe mode)."""
+    """Plan actions without executing them."""
     _setup_logging(verbose)
 
     async def _do() -> None:
@@ -92,8 +91,8 @@ def dry_run_cmd(
 
         async with connect(SOCKET_PATH) as c:
             result = await c.request(
-                RpcMethod.run_task,
-                {"task": task, "brain": brain or "auto", "dry_run": True},
+                RpcMethod.plan_task,
+                {"task": task, "brain": brain or "auto"},
             )
             typer.echo(result.get("run_id", ""))
 
@@ -197,10 +196,11 @@ def list_runs(
             return
         for r in runs:
             status = r["status"]
+            kind = r.get("kind", "run")
             task = r["task"][:50]
             brain = r["brain"]
             run_id = r["run_id"][:8]
-            typer.echo(f"{run_id}  [{status:10s}]  {brain:8s}  {task}")
+            typer.echo(f"{run_id}  [{kind:4s}]  [{status:10s}]  {brain:8s}  {task}")
 
     _run(_do())
 

@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Select, Switch
+from textual.widgets import Button, Input, Label, Select
 
 from agent.ipc.protocol import RpcMethod
 
@@ -47,7 +47,7 @@ class RunModal(ModalScreen[str | None]):
         grid-gutter: 1 2;
         padding: 1 2;
         width: 70;
-        height: 16;
+        height: 14;
         border: double $accent;
         background: $surface;
     }
@@ -76,9 +76,8 @@ class RunModal(ModalScreen[str | None]):
                 id="brain-select",
                 value="auto",
             )
-            yield Label("Dry run:")
-            yield Switch(id="dry-run", value=False)
             with Grid(id="btn-row"):
+                yield Button("Plan", id="plan-btn")
                 yield Button("Run", variant="primary", id="run-btn")
                 yield Button("Cancel", id="cancel-btn")
 
@@ -92,12 +91,14 @@ class RunModal(ModalScreen[str | None]):
             return
         brain_val = self.query_one("#brain-select", Select).value
         brain = str(brain_val) if brain_val is not Select.BLANK else "auto"
-        dry_run = self.query_one("#dry-run", Switch).value
+        method = (
+            RpcMethod.plan_task if event.button.id == "plan-btn" else RpcMethod.run_task
+        )
         conn = self.app._conn  # type: ignore[attr-defined]
         try:
             result = await conn.request(
-                RpcMethod.run_task,
-                {"task": task, "brain": brain, "dry_run": dry_run},
+                method,
+                {"task": task, "brain": brain},
             )
             self.dismiss(result.get("run_id"))
         except Exception as exc:
