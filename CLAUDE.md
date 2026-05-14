@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Local-first agentic desktop controller for Hyprland/Wayland. A long-running daemon takes natural-language tasks, screenshots the desktop, asks an LLM "brain" for actions, and executes them via `wtype` (keyboard), `ydotool` (mouse), and Hyprland IPC. Safety is allowlist + killswitch + dry-run.
+Local-first agentic desktop controller for Hyprland/Wayland. A long-running daemon takes natural-language tasks, screenshots the desktop, asks an LLM "brain" for actions, and executes them via `wtype` (keyboard), `ydotool` (mouse), and Hyprland IPC. Safety is allowlist + killswitch + explicit planning before real execution.
 
 Read `README.md` for prerequisites, setup, and user-facing docs. This file covers what's not obvious from the code.
 
@@ -16,7 +16,7 @@ uv run pytest                # full test suite (180 tests)
 uv run pytest tests/test_orchestrator.py::test_name   # single test
 uv run agent daemon -v       # run daemon in foreground
 uv run agent doctor          # health check (binaries, sockets, credentials)
-uv run agent dry-run "<task>"  # plan actions without executing — use after any brain change
+uv run agent plan "<task>"   # plan actions without executing
 scripts/install-local.sh       # install host runtime outside this checkout
 scripts/verify-local-install.sh # confirm systemd does not run from repo .venv
 ```
@@ -85,6 +85,9 @@ Input is **not** routed through Hyprland: keyboard via `wtype`, mouse via `ydoto
 - **Run hard timeout is 300s** (`_RUN_TIMEOUT` in `daemon/run_executor.py`). Long screen tasks abort with `RunStatus.errored`.
 - **Screenshot is downscaled to 0.5×** before sending to the brain; the brain's coords are scaled back up before dispatch. Coordinate translation lives in **two places** — `claude.py`'s `_computer_action_to_actions` and `openai_brain.py`'s `_sc()` helper. Keep them in parity when adding new action kinds.
 - **Key normalization** (`tools/input.py`): the LLM uses friendly names (`enter`, `esc`, `pageup`, `super`) which are mapped to `wtype` X11 names (`Return`, `Escape`, `Prior`). Modifiers are sent with `-M` and released in reverse order with `-m`.
+- **Terminal commands** use `terminal_command` and `tools/terminal.py`, not
+  `type_text` + `Return` into the focused terminal. `hold_s` is only for visible
+  debug/test runs and is capped at 30 seconds.
 - **Killswitch is edge-triggered**: the `STOP` file flag is consumed by `disarm()` after detection to avoid log spam. `agent stop` always writes the file flag, then also sends RPC if the daemon is reachable.
 - **Allowlist defaults to deny-all**. Password-manager class names (`1password`, `_1password`, `keepassxc`, `gnome-keyring`) are always blocked regardless of the allowlist.
 - **NDJSON frame size cap is 1 MiB** (`ipc/constants.py`). Protocol version 1.0; major-version mismatches are rejected.

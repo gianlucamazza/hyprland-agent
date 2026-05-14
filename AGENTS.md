@@ -13,7 +13,7 @@ The architecture is daemon-centric: CLI and TUI clients talk to the daemon over 
 - `uv run pytest tests/test_input.py`: run one test module while iterating.
 - `uv run agent doctor`: check local prerequisites, sockets, credentials, and configuration.
 - `uv run agent daemon -v`: run the daemon in the foreground for local debugging.
-- `uv run agent dry-run "<task>"`: exercise the planner without executing desktop actions.
+- `uv run agent plan "<task>"`: plan actions without executing desktop actions.
 - `scripts/install-local.sh`: build and install the host runtime outside the source checkout.
 - `scripts/verify-local-install.sh`: verify the user service is not importing from the repo venv.
 
@@ -41,8 +41,10 @@ Recent history uses Conventional Commit prefixes such as `feat:` and `fix:`. Kee
 
 ## Security & Configuration Notes
 
-Treat screenshots, provider keys, and desktop sockets as sensitive. Do not send credentials over IPC or broaden the allowlist casually. Before real desktop runs, verify `agent doctor`, bind the kill switch, and use `agent dry-run` after provider or action-loop changes.
+Treat screenshots, provider keys, and desktop sockets as sensitive. Do not send credentials over IPC or broaden the allowlist casually. Before real desktop runs, verify `agent doctor`, bind the kill switch, and use `agent plan` after provider or action-loop changes.
 
 Configuration lives under `~/.config/hyprland-agent/` (`allowlist.yaml`, `rules.yaml`, `env`, optional `config.yaml`). Use `config.yaml` for provider enablement and audit settings; use `env` for provider credentials and model overrides loaded by the daemon. Runtime state lives under `~/.cache/hyprland-agent/`, including `runs.db` and the `STOP` kill-switch flag. The kill switch is edge-triggered: detection consumes the flag to avoid repeated logs, and `agent stop` writes the file flag before attempting daemon RPC.
 
 The allowlist is deny-by-default when empty. Password-manager windows such as `1password`, `_1password`, `keepassxc`, and `gnome-keyring` are always blocked regardless of allowlist entries. Rule `run` actions must stay `shlex.split` parsed, constrained to the whitelisted environment, and protected by the destructive first-token deny list.
+
+The orchestrator refuses `type_text`, `key`, and `clipboard_paste` when the focused window hosts a control terminal (codex/claude/agent) to avoid agent feedback loops. Use the `terminal_command` action for foreground shell work; `hold_s` is clamped to 30 s.

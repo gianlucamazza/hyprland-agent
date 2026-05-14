@@ -21,7 +21,7 @@ actions through Wayland/Hyprland tools, and records what happened.
 
 - Not a generic cloud RPA platform.
 - Not a multi-provider router for arbitrary model benchmarking.
-- Not a tool to run without an allowlist, a kill switch, and a dry-run pass.
+- Not a tool to run without an allowlist, a kill switch, and an explicit plan pass.
 - Not a safe way to expose your desktop socket to other users or machines.
 
 ## Architecture
@@ -118,16 +118,16 @@ be enabled or disabled from local config. This matters operationally: if
 Anthropic credits or OAuth are unavailable, disable Claude and let `auto` use
 OpenAI or another configured provider.
 
-| Role | Provider | Brain option | Default model |
-|---|---|---:|---|
-| Primary | Anthropic Claude computer-use | `--brain claude` | `claude-opus-4-7` |
-| Claude fallback | Anthropic Claude computer-use | `ANTHROPIC_MODEL=claude-sonnet-4-6` | `claude-sonnet-4-6` |
-| Premium fallback | OpenAI vision/tool calling | `--brain openai` | `gpt-5.2` |
-| Economy fallback | Moonshot Kimi | `--brain kimi` | `kimi-k2.6` |
-| Experimental | Groq | `--brain groq` | see `.env.example` |
-| Experimental | Together AI | `--brain together` | see `.env.example` |
-| Experimental | Z.AI / GLM | `--brain zai` or `--brain glm` | see `.env.example` |
-| Experimental | Qwen / DashScope | `--brain qwen` | see `.env.example` |
+| Role             | Provider                      |                        Brain option | Default model       |
+| ---------------- | ----------------------------- | ----------------------------------: | ------------------- |
+| Primary          | Anthropic Claude computer-use |                    `--brain claude` | `claude-opus-4-7`   |
+| Claude fallback  | Anthropic Claude computer-use | `ANTHROPIC_MODEL=claude-sonnet-4-6` | `claude-sonnet-4-6` |
+| Premium fallback | OpenAI vision/tool calling    |                    `--brain openai` | `gpt-5.2`           |
+| Economy fallback | Moonshot Kimi                 |                      `--brain kimi` | `kimi-k2.6`         |
+| Experimental     | Groq                          |                      `--brain groq` | see `.env.example`  |
+| Experimental     | Together AI                   |                  `--brain together` | see `.env.example`  |
+| Experimental     | Z.AI / GLM                    |      `--brain zai` or `--brain glm` | see `.env.example`  |
+| Experimental     | Qwen / DashScope              |                      `--brain qwen` | see `.env.example`  |
 
 Avoid routed or aggregate providers as the default desktop-control brain.
 Desktop screenshots are sensitive, and action reliability matters more than
@@ -158,8 +158,8 @@ brain:
 audit_log: false
 ```
 
-With that config and `OPENAI_API_KEY` in the daemon environment, `agent run`
-and `agent dry-run` use OpenAI through `--brain auto`. Explicit provider
+With that config and `OPENAI_API_KEY` in the daemon environment, `agent plan`
+and `agent run` use OpenAI through `--brain auto`. Explicit provider
 choices still work only when that provider is enabled in config.
 
 ## Credentials
@@ -233,10 +233,10 @@ restarting the daemon.
 
 ### First safe run
 
-Use `dry-run` before allowing real desktop actions:
+Use `plan` before allowing real desktop actions:
 
 ```bash
-agent dry-run "resize the focused window to 800x600"
+agent plan "resize the focused window to 800x600"
 agent run "open foot and run htop"
 ```
 
@@ -247,9 +247,10 @@ agent run "open foot and run htop"
 agent run "open foot and run htop"
 agent run --brain openai "find and click the Accept button"
 agent run --brain kimi "summarize the visible terminal output"
+agent run "run printf hello in an agent-owned terminal and keep it visible for 3 seconds"
 
 # Plan actions without executing them
-agent dry-run "resize the focused window to 800x600"
+agent plan "resize the focused window to 800x600"
 
 # List open windows
 agent windows
@@ -409,21 +410,25 @@ Opt-in JSONL audit logging is available when `audit_log: true` is set in:
 - Treat screenshots as sensitive data. Provider choice is a security decision.
 - Keep the daemon socket local. It is created under `$XDG_RUNTIME_DIR` with mode
   `0600`.
-- Use `agent dry-run` before first real runs or after changing providers.
+- Use `agent plan` before first real runs or after changing providers.
+- For visible terminal validation, explicitly ask to keep the agent-owned
+  terminal open for a few seconds; normal shell commands close immediately.
 - Do not rely on watch rules for destructive host operations.
 
 ## Breaking changes (v1 -> v2)
 
-| Old command | New command |
-|---|---|
-| `agent init-allowlist` | `agent config init-allowlist` |
-| `agent bind-killswitch` | `agent config bind-killswitch` |
-| `agent watch` | Watcher runs inside the daemon. Use `agent rules reload` to reload rules. |
+| Old command             | New command                                                               |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `agent init-allowlist`  | `agent config init-allowlist`                                             |
+| `agent bind-killswitch` | `agent config bind-killswitch`                                            |
+| `agent watch`           | Watcher runs inside the daemon. Use `agent rules reload` to reload rules. |
 
-| Old | New |
-|---|---|
+| Old                            | New                                                   |
+| ------------------------------ | ----------------------------------------------------- |
 | `hyprland-agent-watch.service` | `hyprland-agent.service`; run `agent migrate-systemd` |
-| JSONL as primary storage | SQLite `runs.db`; JSONL is opt-in audit output |
+| JSONL as primary storage       | SQLite `runs.db`; JSONL is opt-in audit output        |
+| `RunSummary.dry_run: bool`     | `RunSummary.kind: RunKind` (`run`\|`plan`)            |
+| `agent dry-run`                | `agent plan`                                          |
 
 ## Current validation status
 
