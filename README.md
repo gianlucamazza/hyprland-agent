@@ -94,8 +94,10 @@ uv sync
 ## Provider policy
 
 The agent controls a real desktop, so provider choice is reliability-first.
-Claude is the default action brain; OpenAI-compatible providers are explicit
-fallbacks or experiments.
+Claude is the recommended action brain when available, but every provider can
+be enabled or disabled from local config. This matters operationally: if
+Anthropic credits or OAuth are unavailable, disable Claude and let `auto` use
+OpenAI or another configured provider.
 
 | Role | Provider | Brain option | Default model |
 |---|---|---:|---|
@@ -111,6 +113,35 @@ fallbacks or experiments.
 Avoid routed or aggregate providers as the default desktop-control brain.
 Desktop screenshots are sensitive, and action reliability matters more than
 provider breadth.
+
+Provider selection is controlled by:
+
+```yaml
+# ~/.config/hyprland-agent/config.yaml
+brain:
+  default: auto
+  auto_order: [openai, claude, moonshot, groq, together, zai, qwen]
+  providers:
+    claude:
+      enabled: false
+    openai:
+      enabled: true
+    moonshot:
+      enabled: false
+    groq:
+      enabled: false
+    together:
+      enabled: false
+    zai:
+      enabled: false
+    qwen:
+      enabled: false
+audit_log: false
+```
+
+With that config and `OPENAI_API_KEY` in the daemon environment, `agent run`
+and `agent dry-run` use OpenAI through `--brain auto`. Explicit provider
+choices still work only when that provider is enabled in config.
 
 ## Credentials
 
@@ -129,6 +160,8 @@ export ANTHROPIC_MODEL=claude-sonnet-4-6
 
 OpenAI-compatible providers use environment variables in the daemon process.
 Use `.env.example` as the canonical list of keys and model override names.
+Provider enablement belongs in `config.yaml`; credentials belong in the daemon
+environment.
 
 Recommended injection options:
 
@@ -370,8 +403,7 @@ Opt-in JSONL audit logging is available when `audit_log: true` is set in:
 
 ## Current validation status
 
-The codebase is close to a usable local prototype, but the test suite is not
-currently green.
+The codebase is currently green in this workspace.
 
 Observed on this workspace:
 
@@ -382,18 +414,13 @@ uv run pytest
 Result:
 
 ```text
-149 tests collected
-148 passed, 1 failed
+180 tests collected
+180 passed
 ```
 
-The remaining failure is the Textual snapshot test:
-
-```text
-tests/test_tui.py::test_tui_error_screen_snapshot
-```
-
-The generated failure report is `snapshot_report.html`. Treat this as the
-remaining validation gap before calling the project fully green.
+The Textual error-screen snapshot is tracked under `tests/__snapshots__/`.
+If it fails after a TUI change, inspect `snapshot_report.html` before updating
+the snapshot intentionally.
 
 ## Development
 
