@@ -197,7 +197,21 @@ def test_router_aliases(
     expected_base: str | None,
 ) -> None:
     from agent.brain.router import get_brain
+    from agent.config import AgentConfig, BrainConfig
 
+    providers = {
+        "claude": True,
+        "openai": True,
+        "moonshot": True,
+        "groq": True,
+        "together": True,
+        "zai": True,
+        "qwen": True,
+    }
+    monkeypatch.setattr(
+        "agent.brain.router.load_config",
+        lambda: AgentConfig(brain=BrainConfig(providers=providers)),
+    )
     monkeypatch.setenv(env_key, "test")
     brain = get_brain(alias)
     assert isinstance(brain, OpenAICompatibleBrain)
