@@ -15,6 +15,8 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
+ENV_FILE_PATH = Path.home() / ".config" / "hyprland-agent" / "env"
+
 
 class Status(str, Enum):
     ok = "OK"
@@ -28,6 +30,40 @@ class Check:
     status: Status
     message: str
     fix: str = ""
+
+
+def _read_env_file(path: Path = ENV_FILE_PATH) -> dict[str, str]:
+    """Read simple KEY=VALUE EnvironmentFile entries without shell expansion."""
+    if not path.exists():
+        return {}
+    values: dict[str, str] = {}
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line.removeprefix("export ").strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key] = value
+    return values
+
+
+def _env_value(name: str) -> tuple[str | None, str | None]:
+    process_value = os.environ.get(name, "").strip()
+    if process_value:
+        return process_value, "process env"
+    file_value = _read_env_file().get(name, "").strip()
+    if file_value:
+        return file_value, str(ENV_FILE_PATH)
+    return None, None
 
 
 def _which(cmd: str) -> Check:
@@ -106,8 +142,11 @@ def _oauth_creds() -> Check:
         return Check("Claude OAuth", Status.warn, "disabled by provider config")
 
     path = Path.home() / ".claude" / ".credentials.json"
-    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "").strip():
-        return Check("Claude OAuth", Status.ok, "CLAUDE_CODE_OAUTH_TOKEN set")
+    _, source = _env_value("CLAUDE_CODE_OAUTH_TOKEN")
+    if source:
+        return Check(
+            "Claude OAuth", Status.ok, f"CLAUDE_CODE_OAUTH_TOKEN set in {source}"
+        )
     if not path.exists():
         status = Status.fail if "claude" in config.brain.auto_order else Status.warn
         return Check(
@@ -147,20 +186,24 @@ def _anthropic_model() -> Check:
     if not config.brain.is_enabled("claude"):
         return Check("ANTHROPIC_MODEL", Status.warn, "disabled by provider config")
 
-    model = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-7")
+    model, source = _env_value("ANTHROPIC_MODEL")
+    model = model or "claude-opus-4-7"
+    suffix = f" from {source}" if source else ""
     if model == "claude-opus-4-7":
         return Check(
             "ANTHROPIC_MODEL",
             Status.ok,
-            f"{model} (primary: reliable computer-use)",
+            f"{model} (primary: reliable computer-use){suffix}",
         )
     if model.startswith("claude-sonnet-"):
         return Check(
             "ANTHROPIC_MODEL",
             Status.warn,
-            f"{model} (lower-cost fallback)",
+            f"{model} (lower-cost fallback){suffix}",
         )
-    return Check("ANTHROPIC_MODEL", Status.warn, f"{model} (custom Claude model)")
+    return Check(
+        "ANTHROPIC_MODEL", Status.warn, f"{model} (custom Claude model){suffix}"
+    )
 
 
 def _provider_checks() -> list[Check]:
@@ -183,11 +226,13 @@ def _provider_checks() -> list[Check]:
         if not config.brain.is_enabled(provider_key):
             out.append(Check(cfg.key_env, Status.warn, "disabled by provider config"))
             continue
-        has_key = bool(os.environ.get(cfg.key_env))
-        model = os.environ.get(cfg.model_env, cfg.default_model)
-        if has_key:
-            out.append(Check(cfg.key_env, Status.ok, "set"))
-            out.append(Check(cfg.model_env, Status.ok, model))
+        _, key_source = _env_value(cfg.key_env)
+        model, model_source = _env_value(cfg.model_env)
+        model = model or cfg.default_model
+        if key_source:
+            out.append(Check(cfg.key_env, Status.ok, f"set in {key_source}"))
+            model_msg = f"{model} from {model_source}" if model_source else model
+            out.append(Check(cfg.model_env, Status.ok, model_msg))
         else:
             out.append(
                 Check(
