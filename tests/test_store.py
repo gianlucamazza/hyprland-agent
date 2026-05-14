@@ -3,21 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 import time
 from pathlib import Path
 
 import pytest
 
 from agent.daemon.store import RunStore
-from agent.schemas import RunEventRecord, RunRecord, RunStatus, RunSummary
+from agent.schemas import RunEventRecord, RunKind, RunRecord, RunStatus, RunSummary
 
 
 def _summary(run_id: str = "run-1", **kwargs) -> RunSummary:
     defaults = dict(
         run_id=run_id,
+        kind=RunKind.run,
         task="open foot",
         brain="claude",
-        dry_run=False,
         status=RunStatus.running,
         started_at=time.time(),
         ended_at=None,
@@ -46,7 +47,14 @@ async def test_insert_and_list(store: RunStore) -> None:
     runs = await store.list_runs()
     assert len(runs) == 1
     assert runs[0].run_id == "r1"
+    assert runs[0].kind == RunKind.run
     assert runs[0].status == RunStatus.running
+
+
+async def test_insert_plan_kind(store: RunStore) -> None:
+    await store.insert_run(_summary("p1", kind=RunKind.plan))
+    runs = await store.list_runs()
+    assert runs[0].kind == RunKind.plan
 
 
 async def test_list_multiple_ordered_by_started_at(store: RunStore) -> None:
@@ -81,6 +89,59 @@ async def test_get_run_with_events(store: RunStore) -> None:
     assert len(record.events) == 2
     assert record.events[0].kind == "start"
     assert record.events[1].kind == "action"
+
+
+async def test_legacy_run_table_is_rebuilt(tmp_path: Path) -> None:
+    db_path = tmp_path / "runs.db"
+    legacy_col = "dry" + "_run"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            f"""
+            CREATE TABLE runs (
+                run_id TEXT PRIMARY KEY,
+                task TEXT NOT NULL,
+                brain TEXT NOT NULL,
+                {legacy_col} INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                started_at REAL NOT NULL,
+                ended_at REAL,
+                error_text TEXT
+            )
+            """
+        )
+        conn.execute(
+            "CREATE TABLE run_events ("
+            "run_id TEXT NOT NULL REFERENCES runs(run_id),"
+            "seq INTEGER NOT NULL,"
+            "ts REAL NOT NULL,"
+            "kind TEXT NOT NULL,"
+            "payload_json TEXT NOT NULL,"
+            "PRIMARY KEY (run_id, seq)"
+            ")"
+        )
+        conn.execute(
+            f"INSERT INTO runs (run_id, task, brain, {legacy_col}, status, started_at)"
+            " VALUES ('r1', 'task', 'auto', 0, 'completed', ?)",
+            (time.time(),),
+        )
+        conn.execute(
+            "INSERT INTO run_events (run_id, seq, ts, kind, payload_json)"
+            " VALUES ('r1', 0, ?, 'start', '{}')",
+            (time.time(),),
+        )
+        conn.commit()
+
+    store = RunStore(path=db_path)
+    await store.open()
+    record = await store.get_run("r1")
+    await store.close()
+
+    assert record is not None
+    assert record.kind == RunKind.run
+    assert record.events[0].kind == "start"
+    with sqlite3.connect(db_path) as conn:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
+    assert legacy_col not in cols
 
 
 # --- update status ---

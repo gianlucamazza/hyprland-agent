@@ -24,10 +24,18 @@ Handler = Any  # async def(state, params) -> dict
 async def _run_task(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
     task = params.get("task", "")
     brain = params.get("brain", "auto")
-    dry_run = bool(params.get("dry_run", False))
     if not task:
         raise ValueError("task must be a non-empty string")
-    run_id = await state.executor.submit(task, brain, dry_run)
+    run_id = await state.executor.submit(task, brain)
+    return {"run_id": run_id}
+
+
+async def _plan_task(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    task = params.get("task", "")
+    brain = params.get("brain", "auto")
+    if not task:
+        raise ValueError("task must be a non-empty string")
+    run_id = await state.executor.submit_plan(task, brain)
     return {"run_id": run_id}
 
 
@@ -103,6 +111,7 @@ async def _daemon_status(state: AppState, params: dict[str, Any]) -> dict[str, A
 
 
 _DISPATCH: dict[RpcMethod, Handler] = {
+    RpcMethod.plan_task: _plan_task,
     RpcMethod.run_task: _run_task,
     RpcMethod.cancel_run: _cancel_run,
     RpcMethod.list_runs: _list_runs,

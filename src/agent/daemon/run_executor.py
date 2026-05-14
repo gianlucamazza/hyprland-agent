@@ -13,7 +13,7 @@ from agent.daemon.audit_log import AuditLog
 from agent.daemon.pubsub import PubSub
 from agent.daemon.store import RunStore
 from agent.ipc.protocol import Topic
-from agent.schemas import RunEventRecord, RunStatus, RunSummary
+from agent.schemas import RunEventRecord, RunKind, RunStatus, RunSummary
 
 log = logging.getLogger(__name__)
 
@@ -43,36 +43,47 @@ class RunExecutor:
     # Public API
     # ------------------------------------------------------------------
 
-    async def submit(self, task: str, brain_name: str, dry_run: bool) -> str:
+    async def submit(self, task: str, brain_name: str) -> str:
         """Start a run asynchronously. Returns the run_id immediately."""
+        return await self._submit(RunKind.run, task, brain_name)
+
+    async def submit_plan(self, task: str, brain_name: str) -> str:
+        """Start a planning task asynchronously. Returns the run_id immediately."""
+        return await self._submit(RunKind.plan, task, brain_name)
+
+    async def _submit(self, kind: RunKind, task: str, brain_name: str) -> str:
         from agent.brain.router import get_brain
 
         run_id = str(uuid.uuid4())
         summary = RunSummary(
             run_id=run_id,
+            kind=kind,
             task=task,
             brain=brain_name,
-            dry_run=dry_run,
             status=RunStatus.running,
             started_at=time.time(),
         )
         await self._store.insert_run(summary)
         self._seq[run_id] = 0
 
-        brain = get_brain(brain_name, dry_run=dry_run)
+        brain = get_brain(brain_name)
         ctx = RunContext(run_id=run_id, _emit_fn=self._make_emit(run_id))
 
-        t = asyncio.create_task(self._run_task(run_id, task, brain, dry_run, ctx))
+        t = asyncio.create_task(self._run_task(run_id, kind, task, brain, ctx))
         self._tasks[run_id] = t
         t.add_done_callback(lambda _: self._tasks.pop(run_id, None))
 
-        await self._publish(run_id, "run_started", {"task": task, "brain": brain_name})
+        await self._publish(
+            run_id,
+            f"{kind.value}_started",
+            {"entry_kind": kind.value, "task": task, "brain": brain_name},
+        )
         log.info(
-            "Run %s started (task=%r brain=%s dry=%s)",
+            "%s %s started (task=%r brain=%s)",
+            kind.value.capitalize(),
             run_id,
             task,
             brain_name,
-            dry_run,
         )
         return run_id
 
@@ -121,38 +132,40 @@ class RunExecutor:
     async def _run_task(
         self,
         run_id: str,
+        kind: RunKind,
         task: str,
         brain: Any,
-        dry_run: bool,
         ctx: RunContext,
     ) -> None:
-        from agent.orchestrator import run as _orchestrate
+        from agent.orchestrator import plan as _plan
+        from agent.orchestrator import run as _run
 
         _RUN_TIMEOUT = 300.0  # 5 minutes hard cap
+        orchestrate = _plan if kind == RunKind.plan else _run
 
         try:
             await asyncio.wait_for(
-                _orchestrate(task, brain, dry_run=dry_run, ctx=ctx),
+                orchestrate(task, brain, ctx=ctx),
                 timeout=_RUN_TIMEOUT,
             )
             await self._store.update_run_status(run_id, RunStatus.completed)
-            await self._publish(run_id, "run_completed", {})
-            log.info("Run %s completed", run_id)
+            await self._publish(run_id, f"{kind.value}_completed", {})
+            log.info("%s %s completed", kind.value.capitalize(), run_id)
         except asyncio.TimeoutError:
-            msg = f"Run timed out after {int(_RUN_TIMEOUT)}s"
+            msg = f"{kind.value.capitalize()} timed out after {int(_RUN_TIMEOUT)}s"
             await self._store.update_run_status(run_id, RunStatus.errored, error=msg)
-            await self._publish(run_id, "run_errored", {"error": msg})
-            log.error("Run %s timed out", run_id)
+            await self._publish(run_id, f"{kind.value}_errored", {"error": msg})
+            log.error("%s %s timed out", kind.value.capitalize(), run_id)
         except asyncio.CancelledError:
             await self._store.update_run_status(run_id, RunStatus.aborted)
-            await self._publish(run_id, "run_aborted", {})
-            log.info("Run %s aborted", run_id)
+            await self._publish(run_id, f"{kind.value}_aborted", {})
+            log.info("%s %s aborted", kind.value.capitalize(), run_id)
             raise
         except Exception as exc:
             await self._store.update_run_status(
                 run_id, RunStatus.errored, error=str(exc)
             )
-            await self._publish(run_id, "run_errored", {"error": str(exc)})
-            log.error("Run %s errored: %s", run_id, exc)
+            await self._publish(run_id, f"{kind.value}_errored", {"error": str(exc)})
+            log.error("%s %s errored: %s", kind.value.capitalize(), run_id, exc)
         finally:
             self._seq.pop(run_id, None)

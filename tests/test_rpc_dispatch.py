@@ -27,6 +27,38 @@ def test_all_handlers_are_callable() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_task_submits_execution() -> None:
+    class Executor:
+        async def submit(self, task: str, brain: str) -> str:
+            self.args = (task, brain)
+            return "run-1"
+
+    class State:
+        executor = Executor()
+
+    result = await rpc._run_task(State(), {"task": "open foot", "brain": "openai"})
+
+    assert result == {"run_id": "run-1"}
+    assert State.executor.args == ("open foot", "openai")
+
+
+@pytest.mark.asyncio
+async def test_plan_task_submits_planning() -> None:
+    class Executor:
+        async def submit_plan(self, task: str, brain: str) -> str:
+            self.args = (task, brain)
+            return "plan-1"
+
+    class State:
+        executor = Executor()
+
+    result = await rpc._plan_task(State(), {"task": "inspect", "brain": "auto"})
+
+    assert result == {"run_id": "plan-1"}
+    assert State.executor.args == ("inspect", "auto")
+
+
+@pytest.mark.asyncio
 async def test_daemon_status_uses_package_version(monkeypatch: pytest.MonkeyPatch) -> None:
     class Executor:
         async def active_run_ids(self) -> list[str]:

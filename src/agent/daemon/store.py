@@ -10,7 +10,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agent.schemas import RunEventRecord, RunRecord, RunStatus, RunSummary
+from agent.schemas import RunEventRecord, RunKind, RunRecord, RunStatus, RunSummary
 
 if TYPE_CHECKING:
     pass
@@ -22,9 +22,9 @@ PRAGMA journal_mode=WAL;
 
 CREATE TABLE IF NOT EXISTS runs (
     run_id     TEXT PRIMARY KEY,
+    kind       TEXT NOT NULL DEFAULT 'run',
     task       TEXT NOT NULL,
     brain      TEXT NOT NULL,
-    dry_run    INTEGER NOT NULL,
     status     TEXT NOT NULL,
     started_at REAL NOT NULL,
     ended_at   REAL,
@@ -64,11 +64,39 @@ class RunStore:
 
     def _init_db(self, conn: sqlite3.Connection) -> None:
         conn.executescript(_SCHEMA)
-        # Migration: add error_text column to existing databases
         cols = {row[1] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
+        legacy_col = "dry" + "_run"
         if "error_text" not in cols:
             conn.execute("ALTER TABLE runs ADD COLUMN error_text TEXT")
-            conn.commit()
+            cols.add("error_text")
+        if "kind" not in cols:
+            conn.execute("ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'run'")
+            cols.add("kind")
+        if legacy_col in cols:
+            self._rebuild_runs_table(conn)
+        conn.commit()
+
+    def _rebuild_runs_table(self, conn: sqlite3.Connection) -> None:
+        conn.executescript(
+            """
+            CREATE TABLE runs_new (
+                run_id     TEXT PRIMARY KEY,
+                kind       TEXT NOT NULL DEFAULT 'run',
+                task       TEXT NOT NULL,
+                brain      TEXT NOT NULL,
+                status     TEXT NOT NULL,
+                started_at REAL NOT NULL,
+                ended_at   REAL,
+                error_text TEXT
+            );
+            INSERT INTO runs_new (run_id, kind, task, brain, status, started_at, ended_at, error_text)
+            SELECT run_id, COALESCE(kind, 'run'), task, brain, status, started_at, ended_at, error_text
+            FROM runs;
+            DROP TABLE runs;
+            ALTER TABLE runs_new RENAME TO runs;
+            CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at DESC);
+            """
+        )
 
     async def close(self) -> None:
         pass  # connections are per-call; nothing to close
@@ -83,13 +111,13 @@ class RunStore:
 
     def _do_insert_run(self, conn: sqlite3.Connection, run: RunSummary) -> None:
         conn.execute(
-            "INSERT INTO runs (run_id, task, brain, dry_run, status, started_at, ended_at)"
+            "INSERT INTO runs (run_id, kind, task, brain, status, started_at, ended_at)"
             " VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 run.run_id,
+                run.kind.value,
                 run.task,
                 run.brain,
-                int(run.dry_run),
                 run.status.value,
                 run.started_at,
                 run.ended_at,
@@ -160,7 +188,7 @@ class RunStore:
     def _do_list_runs(self, conn: sqlite3.Connection, limit: int) -> list[sqlite3.Row]:
         conn.row_factory = sqlite3.Row
         return conn.execute(
-            "SELECT run_id, task, brain, dry_run, status, started_at, ended_at, error_text"
+            "SELECT run_id, kind, task, brain, status, started_at, ended_at, error_text"
             " FROM runs ORDER BY started_at DESC LIMIT ?",
             (limit,),
         ).fetchall()
@@ -189,7 +217,7 @@ class RunStore:
     ) -> tuple[sqlite3.Row, list[sqlite3.Row]] | None:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT run_id, task, brain, dry_run, status, started_at, ended_at, error_text"
+            "SELECT run_id, kind, task, brain, status, started_at, ended_at, error_text"
             " FROM runs WHERE run_id=?",
             (run_id,),
         ).fetchone()
@@ -210,9 +238,9 @@ class RunStore:
     def _row_to_summary(row: sqlite3.Row) -> RunSummary:
         return RunSummary(
             run_id=row["run_id"],
+            kind=RunKind(row["kind"]),
             task=row["task"],
             brain=row["brain"],
-            dry_run=bool(row["dry_run"]),
             status=RunStatus(row["status"]),
             started_at=row["started_at"],
             ended_at=row["ended_at"],
