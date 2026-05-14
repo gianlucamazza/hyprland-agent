@@ -76,6 +76,13 @@ async def run(
             active.title,
             active.app_class,
         )
+        await _emit(
+            "blocked",
+            {
+                "reason": "window_not_allowlisted",
+                "active": active.model_dump(),
+            },
+        )
         print(
             f"[BLOCKED] Window '{active.title}' ({active.app_class}) is not in the allowlist."
         )
