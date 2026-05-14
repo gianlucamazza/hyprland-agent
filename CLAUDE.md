@@ -17,6 +17,8 @@ uv run pytest tests/test_orchestrator.py::test_name   # single test
 uv run agent daemon -v       # run daemon in foreground
 uv run agent doctor          # health check (binaries, sockets, credentials)
 uv run agent dry-run "<task>"  # plan actions without executing — use after any brain change
+scripts/install-local.sh       # install host runtime outside this checkout
+scripts/verify-local-install.sh # confirm systemd does not run from repo .venv
 ```
 
 No Makefile, no ruff config in `pyproject.toml` despite `.ruff_cache/` being present. `pytest-asyncio` is in auto mode (`pyproject.toml:37`).

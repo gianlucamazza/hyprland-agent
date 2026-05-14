@@ -14,6 +14,8 @@ The architecture is daemon-centric: CLI and TUI clients talk to the daemon over 
 - `uv run agent doctor`: check local prerequisites, sockets, credentials, and configuration.
 - `uv run agent daemon -v`: run the daemon in the foreground for local debugging.
 - `uv run agent dry-run "<task>"`: exercise the planner without executing desktop actions.
+- `scripts/install-local.sh`: build and install the host runtime outside the source checkout.
+- `scripts/verify-local-install.sh`: verify the user service is not importing from the repo venv.
 
 There is no Makefile and no Ruff configuration in `pyproject.toml`. The Typer entry point is `agent = "agent.cli:app"`.
 

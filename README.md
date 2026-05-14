@@ -86,10 +86,29 @@ After adding yourself to the `input` group, re-login or open a fresh session.
 
 ### Python environment
 
+For development, keep dependencies in the repo-local uv environment:
+
 ```bash
 cd ~/Workspace/ai-agents/hyprland_agent
 uv sync
 ```
+
+Do not point the long-running host service at this checkout venv. Install the
+runtime separately before enabling the service:
+
+```bash
+scripts/install-local.sh
+scripts/verify-local-install.sh
+```
+
+The installer builds a wheel from the checkout, installs it into:
+
+```text
+~/.local/share/hyprland-agent/venv
+```
+
+and points `~/.local/bin/agent` plus the user systemd unit at that installed
+runtime. The source checkout remains for code, tests, and future builds only.
 
 ## Provider policy
 
@@ -203,9 +222,14 @@ agent doctor
 ### systemd service
 
 ```bash
-agent migrate-systemd
+scripts/install-local.sh
 systemctl --user status hyprland-agent
+scripts/verify-local-install.sh
 ```
+
+`agent migrate-systemd` only rewrites the user unit. For a clean host runtime,
+prefer `scripts/install-local.sh`, which installs outside the repository before
+restarting the daemon.
 
 ### First safe run
 
@@ -429,6 +453,10 @@ uv run pytest
 uv run agent doctor
 uv run agent daemon -v
 ```
+
+The development command `uv run agent daemon -v` is for foreground debugging.
+The installed Lenovo service should run through `~/.local/bin/agent`, which must
+resolve outside `~/Workspace/ai-agents/hyprland_agent`.
 
 Before changing behavior, compare the README against:
 

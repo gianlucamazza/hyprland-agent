@@ -293,14 +293,9 @@ def migrate_systemd() -> None:
         typer.echo(f"Removed {old_path}")
 
     # Write new unit
-    agent_bin = shutil.which("agent") or str(
-        Path.home()
-        / "Workspace"
-        / "ai-agents"
-        / "hyprland_agent"
-        / ".venv"
-        / "bin"
-        / "agent"
+    local_agent = Path.home() / ".local" / "bin" / "agent"
+    agent_bin = str(
+        local_agent if local_agent.exists() else shutil.which("agent") or "agent"
     )
     unit_content = f"""[Unit]
 Description=Hyprland agent daemon
@@ -377,14 +372,9 @@ def bind_killswitch() -> None:
         typer.echo(f"Not found: {conf}", err=True)
         raise typer.Exit(1)
 
-    agent_bin = shutil.which("agent") or str(
-        Path.home()
-        / "Workspace"
-        / "ai-agents"
-        / "hyprland_agent"
-        / ".venv"
-        / "bin"
-        / "agent"
+    local_agent = Path.home() / ".local" / "bin" / "agent"
+    agent_bin = str(
+        local_agent if local_agent.exists() else shutil.which("agent") or "agent"
     )
     bind_line = f"bind = SUPER SHIFT, escape, exec, {agent_bin} stop"
 
