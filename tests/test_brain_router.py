@@ -136,16 +136,6 @@ def test_auto_skips_enabled_provider_without_credentials(
     assert brain._client.base_url is None or "openai" in str(brain._client.base_url)
 
 
-def test_dry_run_flag(monkeypatch: pytest.MonkeyPatch) -> None:
-    from agent.brain.claude import ClaudeBrain
-
-    _use_config(monkeypatch, _config())
-    monkeypatch.setattr("agent.brain.router._claude_credentials_available", lambda: True)
-    brain = get_brain("claude", dry_run=True)
-    assert isinstance(brain, ClaudeBrain)
-    assert brain.dry_run is True
-
-
 def test_claude_model_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     from agent.brain.claude import ClaudeBrain
 

@@ -23,8 +23,29 @@ _CUSTOM_TOOLS: list[dict[str, Any]] = [
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "terminal_command",
+        "description": (
+            "Run a shell command in a dedicated terminal owned by this agent run. "
+            "Use this for terminal or shell tasks instead of typing into the focused "
+            "terminal. Set hold_s only when the task asks for a visible/debug test."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string"},
+                "hold_s": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 30,
+                    "default": 0,
+                },
+            },
+            "required": ["command"],
+        },
+    },
+    {
         "name": "focus_window",
-        "description": "Focus a window by its address.",
+        "description": "Queue focusing a window by its address.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -38,7 +59,10 @@ _CUSTOM_TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "dispatch_hypr",
-        "description": "Run a raw Hyprland dispatch command (e.g. 'workspace 2', 'movetoworkspace 3').",
+        "description": (
+            "Queue a raw Hyprland dispatch command "
+            "(e.g. 'workspace 2', 'movetoworkspace 3')."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -66,21 +90,33 @@ def _png_b64(png: bytes) -> str:
     return base64.standard_b64encode(png).decode()
 
 
-async def _handle_custom(name: str, inp: dict[str, Any]) -> str:
+async def _handle_custom(name: str, inp: dict[str, Any]) -> tuple[str, list[Action]]:
     if name == "list_windows":
         wins = await hypr.clients()
         lines = [
             f"{w.address} [{w.app_class}] {w.title!r} at ({w.x},{w.y}) {w.w}x{w.h}"
             for w in wins
         ]
-        return "\n".join(lines) or "(no windows)"
+        return "\n".join(lines) or "(no windows)", []
+    if name == "terminal_command":
+        params: dict[str, Any] = {"command": inp["command"]}
+        if "hold_s" in inp:
+            params["hold_s"] = inp["hold_s"]
+        return "terminal command queued", [
+            Action(
+                kind=ActionKind.terminal_command,
+                params=params,
+            )
+        ]
     if name == "focus_window":
-        await hypr.dispatch(f"focuswindow address:{inp['address']}")
-        return "focused"
+        return "focus queued", [
+            Action(kind=ActionKind.focus_window, params={"address": inp["address"]})
+        ]
     if name == "dispatch_hypr":
-        result = await hypr.dispatch(inp["cmd"])
-        return result or "ok"
-    return "unknown tool"
+        return "dispatch queued", [
+            Action(kind=ActionKind.dispatch, params={"cmd": inp["cmd"]})
+        ]
+    return "unknown tool", []
 
 
 def _computer_action_to_actions(
@@ -147,11 +183,9 @@ class ClaudeBrain:
         self,
         model: str | None = None,
         max_tokens: int = _MAX_TOKENS,
-        dry_run: bool = False,
     ):
         self.model = model or os.environ.get("ANTHROPIC_MODEL", _DEFAULT_MODEL)
         self.max_tokens = max_tokens
-        self.dry_run = dry_run
 
     async def decide(self, state: ScreenState, task: str) -> list[Action]:
         client = anthropic_client()
@@ -170,7 +204,15 @@ class ClaudeBrain:
                             "data": _png_b64(png),
                         },
                     },
-                    {"type": "text", "text": f"Task: {task}"},
+                    {
+                        "type": "text",
+                        "text": (
+                            f"Task: {task}\n\n"
+                            "For terminal or shell commands, use the terminal_command "
+                            "tool instead of typing into the focused terminal. Use "
+                            "hold_s only when the task asks to keep it visible."
+                        ),
+                    },
                 ],
             }
         ]
@@ -193,39 +235,23 @@ class ClaudeBrain:
                             block.input, scale_x=1 / _SCALE, scale_y=1 / _SCALE
                         )
                         all_actions.extend(actions)
-                        if self.dry_run:
-                            tool_results.append(
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": block.id,
-                                    "content": [
-                                        {
-                                            "type": "text",
-                                            "text": "dry-run: action recorded",
-                                        }
-                                    ],
-                                }
-                            )
-                        else:
-                            new_png = await screen.for_vision()
-                            tool_results.append(
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": block.id,
-                                    "content": [
-                                        {
-                                            "type": "image",
-                                            "source": {
-                                                "type": "base64",
-                                                "media_type": "image/png",
-                                                "data": _png_b64(new_png),
-                                            },
-                                        }
-                                    ],
-                                }
-                            )
+                        tool_results.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "action queued",
+                                    }
+                                ],
+                            }
+                        )
                     else:
-                        result_text = await _handle_custom(block.name, block.input)
+                        result_text, actions = await _handle_custom(
+                            block.name, block.input
+                        )
+                        all_actions.extend(actions)
                         tool_results.append(
                             {
                                 "type": "tool_result",

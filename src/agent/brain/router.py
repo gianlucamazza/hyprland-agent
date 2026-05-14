@@ -65,11 +65,11 @@ def _provider_available(provider: str) -> tuple[bool, str]:
     return False, f"{cfg.key_env} not set"
 
 
-def _build_provider(provider: str, dry_run: bool) -> Brain:
+def _build_provider(provider: str) -> Brain:
     if provider == "claude":
         from agent.brain.claude import ClaudeBrain
 
-        return ClaudeBrain(dry_run=dry_run)
+        return ClaudeBrain()
 
     from agent.brain.openai_brain import build_brain
 
@@ -81,7 +81,7 @@ def selectable_providers(config: AgentConfig | None = None) -> list[str]:
     return [provider for provider in cfg.brain.auto_order if cfg.brain.is_enabled(provider)]
 
 
-def get_brain(override: str | None = None, dry_run: bool = False) -> Brain:
+def get_brain(override: str | None = None) -> Brain:
     """
     override: 'claude' | 'openai' | 'gpt' | 'kimi' | 'moonshot' | 'k2' |
               'groq' | 'together' | 'zai' | 'glm' | 'qwen' | 'dashscope' | 'auto' | None
@@ -104,7 +104,7 @@ def get_brain(override: str | None = None, dry_run: bool = False) -> Brain:
         available, reason = _provider_available(provider)
         if not available:
             raise BrainSelectionError(f"Brain provider '{provider}' unavailable: {reason}")
-        return _build_provider(provider, dry_run=dry_run)
+        return _build_provider(provider)
 
     checked: list[str] = []
     for provider in config.brain.auto_order:
@@ -113,7 +113,7 @@ def get_brain(override: str | None = None, dry_run: bool = False) -> Brain:
             continue
         available, reason = _provider_available(provider)
         if available:
-            return _build_provider(provider, dry_run=dry_run)
+            return _build_provider(provider)
         checked.append(f"{provider}: {reason}")
 
     raise BrainSelectionError(

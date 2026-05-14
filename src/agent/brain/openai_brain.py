@@ -174,7 +174,10 @@ _TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "type_text",
-            "description": "Type a string of text.",
+            "description": (
+                "Type text into an already-focused non-terminal GUI text field. "
+                "Do not use this for shell commands."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {"text": {"type": "string"}},
@@ -186,11 +189,37 @@ _TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "key",
-            "description": "Press a key combination (e.g. 'ctrl+c', 'Return', 'Tab', 'Escape', 'BackSpace', 'super+l').",
+            "description": (
+                "Press a key combination in an already-focused non-terminal GUI target."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {"combo": {"type": "string"}},
                 "required": ["combo"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "terminal_command",
+            "description": (
+                "Run a shell command in a dedicated terminal owned by this agent run. "
+                "Use this for terminal or shell tasks. Set hold_s only when the "
+                "task asks for a visible/debug test."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string"},
+                    "hold_s": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 30,
+                        "default": 0,
+                    },
+                },
+                "required": ["command"],
             },
         },
     },
@@ -305,10 +334,18 @@ async def _call_tool(
             Action(kind=ActionKind.key, params={"combo": combo})
         ]
 
+    if name == "terminal_command":
+        command = args["command"]
+        params: dict[str, Any] = {"command": command}
+        if "hold_s" in args:
+            params["hold_s"] = args["hold_s"]
+        return "terminal command queued", [
+            Action(kind=ActionKind.terminal_command, params=params)
+        ]
+
     if name == "focus_window":
         addr = args["address"]
-        await hypr.dispatch(f"focuswindow address:{addr}")
-        return "focused", [
+        return "focus queued", [
             Action(kind=ActionKind.focus_window, params={"address": addr})
         ]
 
@@ -318,8 +355,7 @@ async def _call_tool(
         return "\n".join(lines) or "(none)", []
 
     if name == "dispatch_hypr":
-        result = await hypr.dispatch(args["cmd"])
-        return result or "ok", [
+        return "dispatch queued", [
             Action(kind=ActionKind.dispatch, params={"cmd": args["cmd"]})
         ]
 
@@ -342,7 +378,10 @@ class OpenAICompatibleBrain:
         system_msg = (
             f"You control a {scaled_w}x{scaled_h} desktop screenshot. "
             "Use the provided tools to complete the task. "
-            "Coordinates are in the scaled image space."
+            "Coordinates are in the scaled image space. "
+            "For terminal or shell commands, use terminal_command instead of "
+            "typing into the focused terminal. Use terminal_command.hold_s only "
+            "when the task asks to keep the terminal visible for debugging."
         )
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_msg},
