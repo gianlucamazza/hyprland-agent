@@ -1,0 +1,16 @@
+[Unit]
+Description=Hyprland agent daemon
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionEnvironment=HYPRLAND_INSTANCE_SIGNATURE
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/agent service start
+Restart=on-failure
+RestartSec=5
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+EnvironmentFile=-%h/.config/hyprland-agent/env
+
+[Install]
+WantedBy=graphical-session.target

@@ -65,9 +65,7 @@ class EpisodicMemory:
                     if active and context_class is None:
                         context_class = active.get("class")
 
-            summary_parts = [
-                f"{len(action_kinds)} actions: {', '.join(action_kinds[:8])}"
-            ]
+            summary_parts = [f"{len(action_kinds)} actions: {', '.join(action_kinds[:8])}"]
             if blocked_count:
                 summary_parts.append(f"{blocked_count} blocked")
             if rejected_count:
@@ -79,8 +77,8 @@ class EpisodicMemory:
             try:
                 analytics = await self._store.list_analytics(days=9999)
                 # outcomes per run_id not directly available; use status mapping
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("analytics fetch failed during ingest: %s", exc)
             # Map status to outcome for episodic use
             _STATUS_TO_OUTCOME = {
                 "completed": "success",
@@ -131,9 +129,7 @@ class EpisodicMemory:
 
         exclude = "failure" if filter_failure else None
         try:
-            rows = await self._store.query_episodes_by_vec(
-                emb, k=k, exclude_outcome=exclude
-            )
+            rows = await self._store.query_episodes_by_vec(emb, k=k, exclude_outcome=exclude)
         except Exception as exc:
             log.warning("Episode recall failed: %s", exc)
             return []

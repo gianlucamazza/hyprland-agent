@@ -202,9 +202,7 @@ async def _build_state(task: str, ctx: "RunContext | None") -> tuple[ScreenState
                 "active": active.model_dump(),
             },
         )
-        print(
-            f"[BLOCKED] Window '{active.title}' ({active.app_class}) is not in the allowlist."
-        )
+        print(f"[BLOCKED] Window '{active.title}' ({active.app_class}) is not in the allowlist.")
         print("Edit ~/.config/hyprland-agent/allowlist.yaml to add it.")
         return (
             ScreenState(
@@ -320,8 +318,8 @@ async def run(
         if verifier.needs(action.kind):
             try:
                 pre_hash = verifier.phash(state.screenshot_png)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("pre-hash capture failed: %s", exc)
 
         result = await _execute_action(action, ctx, app_state)
 
@@ -330,8 +328,8 @@ async def run(
                 post_png = await screen.full()
                 post_hash = verifier.phash(post_png)
                 result = verifier.annotate(result, pre_hash, post_hash)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("post-hash capture failed: %s", exc)
 
         brain_ctx.working.record(action.kind.value, action.params)
 
@@ -343,9 +341,7 @@ async def run(
             or result.stderr
             or result.pre_hash
         ):
-            result_data = {
-                k: v for k, v in result.model_dump().items() if v is not None
-            }
+            result_data = {k: v for k, v in result.model_dump().items() if v is not None}
             await _emit("action_result", result_data)
 
         if loop_detector.observe(action):

@@ -1,0 +1,55 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, check that the daemon is running (`agent doctor`) and that the killswitch is disarmed.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `agent run "..."`
+        2. See error in `agent logs`
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: hyprland-agent version
+      placeholder: "e.g. 1.0.0 (from `agent --version`)"
+    validations:
+      required: true
+  - type: input
+    id: brain
+    attributes:
+      label: Brain / provider
+      placeholder: "e.g. claude, openai, auto"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Output of `agent logs` or daemon stderr (sanitize any API keys).
+      render: text
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have run `agent doctor` and noted any failures
+        - label: No API keys or personal data are included in this report

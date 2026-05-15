@@ -298,7 +298,7 @@ wheels = [
 
 [[package]]
 name = "hyprland-agent"
-version = "0.3.0"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -322,14 +322,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.101.0" },
+    { name = "anthropic", specifier = ">=0.101.0,<1.0" },
     { name = "fastembed", specifier = ">=0.4" },
     { name = "jeepney", specifier = ">=0.8" },
-    { name = "openai", specifier = ">=2.36.0" },
+    { name = "openai", specifier = ">=2.36.0,<3.0" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "sqlite-vec", specifier = ">=0.1.6" },
+    { name = "sqlite-vec", specifier = ">=0.1.6,<0.2" },
     { name = "textual", specifier = ">=0.85.0" },
     { name = "typer", specifier = ">=0.25.1" },
 ]

@@ -1,8 +1,43 @@
 # hyprland-agent
 
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/gianlucamazza/hyprland-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/gianlucamazza/hyprland-agent/actions/workflows/ci.yml)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
+[![Release](https://img.shields.io/github/v/release/gianlucamazza/hyprland-agent)](https://github.com/gianlucamazza/hyprland-agent/releases)
+
+> **Requires: Linux + Wayland + Hyprland + Python 3.13+**
+
 Local-first desktop agent for Hyprland / Wayland. It turns natural-language
 tasks and Hyprland events into controlled desktop actions, with explicit
 allowlists, a kill switch, local run history, and daemon-side observability.
+
+## Quickstart
+
+```bash
+# 1. Install system deps (Arch)
+sudo pacman -S ydotool wtype grim wl-clipboard
+sudo usermod -aG input $USER  # re-login after this
+
+# 2. Clone and install
+git clone https://github.com/gianlucamazza/hyprland-agent
+cd hyprland-agent
+scripts/install-local.sh       # installs outside the repo into ~/.local
+
+# 3. Configure and start
+agent config init-allowlist    # edit ~/.config/hyprland-agent/allowlist.yaml
+agent config bind-killswitch   # binds SUPER+SHIFT+ESC kill switch
+hyprctl reload
+agent doctor                   # verify all prerequisites
+
+# 4. Run a task (plan first, then execute)
+agent plan "open foot and run htop"
+agent run  "open foot and run htop"
+```
+
+For AUR (Arch):
+```bash
+yay -S hyprland-agent
+```
 
 The project is meant to be a personal desktop control plane: the agent observes
 the screen, asks a computer-use or vision model for actions, executes those
@@ -504,7 +539,7 @@ Opt-in JSONL audit logging is available when `audit_log: true` is set in:
   terminal open for a few seconds; normal shell commands close immediately.
 - Do not rely on watch rules for destructive host operations.
 
-## Breaking changes (v1 -> v2)
+## CLI rename history
 
 | Old command             | New command                                                               |
 | ----------------------- | ------------------------------------------------------------------------- |
@@ -554,6 +589,6 @@ resolve outside `~/Workspace/ai-agents/hyprland_agent`.
 
 Before changing behavior, compare the README against:
 
-- `src/agent/cli.py` for commands.
+- `src/agent/cli/` package for commands.
 - `src/agent/schemas.py` and `src/agent/daemon/rule_runner.py` for watch rules.
 - `.env.example` for provider environment variables.

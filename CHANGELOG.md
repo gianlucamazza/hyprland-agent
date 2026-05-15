@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-05-15
+
+### Added
+
+- **LICENSE** — Apache-2.0 license file.
+- **SECURITY.md** — vulnerability disclosure policy, scope, and safety disclaimers.
+- **CONTRIBUTING.md** — development setup, branch naming, commit style, test and lint instructions.
+- **CODE_OF_CONDUCT.md** — Contributor Covenant 2.1.
+- **GitHub Actions CI** (`.github/workflows/ci.yml`) — test (pytest -m "not slow"), lint (ruff), and build jobs on push/PR to `main`.
+- **GitHub Actions release** (`.github/workflows/release.yml`) — builds wheel and creates GitHub Release on tag push.
+- **GitHub issue/PR templates** — bug report, feature request, and PR checklist.
+- **AUR packaging** (`packaging/aur/PKGBUILD`) — Arch Linux package with system dependency declarations.
+- **systemd unit template** (`packaging/systemd/hyprland-agent.service`) — portable user service file for AUR and manual installs.
+- **`docs/privacy.md`** — per-provider data handling, local storage inventory, and screenshot handling policy.
+- **`pyproject.toml` metadata** — `readme`, `license`, `authors`, `keywords`, `classifiers`, `[project.urls]`.
+- **`[tool.ruff]` and `[tool.mypy]`** configuration in `pyproject.toml`.
+- **README quickstart** — 4-step install block and requirements box at the top; AUR install path; CI/license/release badges.
+
+### Changed
+
+- `src/agent/cli.py` monolith split into `src/agent/cli/` package (no user-visible change; entry points unchanged).
+- `pyproject.toml` version bumped to `1.0.0`.
+- Upper bounds added on volatile SDK dependencies: `anthropic<1.0`, `openai<3.0`, `sqlite-vec<0.2`.
+- README "Breaking changes (v1 → v2)" section renamed to "CLI rename history" to avoid confusion with package version.
+- README Development section updated to reference `src/agent/cli/` package instead of deleted `cli.py`.
+
+### Fixed
+
+- `orchestrator.py` — `except Exception: pass` on pre/post hash capture replaced with `log.debug(...)`.
+- `memory/episodic.py` — `except Exception: pass` on analytics fetch replaced with `log.debug(...)`.
+
 ## [0.3.0] - 2026-05-15
 
 ### Added
