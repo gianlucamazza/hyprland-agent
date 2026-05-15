@@ -38,6 +38,7 @@ class RunExecutor:
         self._audit = audit
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._seq: dict[str, int] = {}
+        self.app_state: Any = None  # set by AppState.open() after construction
 
     # ------------------------------------------------------------------
     # Public API
@@ -137,35 +138,46 @@ class RunExecutor:
         brain: Any,
         ctx: RunContext,
     ) -> None:
+        from agent.learning.outcome import derive_from_status
         from agent.orchestrator import plan as _plan
         from agent.orchestrator import run as _run
 
         _RUN_TIMEOUT = 300.0  # 5 minutes hard cap
         orchestrate = _plan if kind == RunKind.plan else _run
+        t_start = time.time()
 
+        final_status = RunStatus.errored
         try:
             await asyncio.wait_for(
-                orchestrate(task, brain, ctx=ctx),
+                orchestrate(task, brain, ctx=ctx, app_state=self.app_state),
                 timeout=_RUN_TIMEOUT,
             )
+            final_status = RunStatus.completed
             await self._store.update_run_status(run_id, RunStatus.completed)
             await self._publish(run_id, f"{kind.value}_completed", {})
             log.info("%s %s completed", kind.value.capitalize(), run_id)
         except asyncio.TimeoutError:
+            final_status = RunStatus.errored
             msg = f"{kind.value.capitalize()} timed out after {int(_RUN_TIMEOUT)}s"
             await self._store.update_run_status(run_id, RunStatus.errored, error=msg)
             await self._publish(run_id, f"{kind.value}_errored", {"error": msg})
             log.error("%s %s timed out", kind.value.capitalize(), run_id)
         except asyncio.CancelledError:
+            final_status = RunStatus.aborted
             await self._store.update_run_status(run_id, RunStatus.aborted)
             await self._publish(run_id, f"{kind.value}_aborted", {})
             log.info("%s %s aborted", kind.value.capitalize(), run_id)
             raise
         except Exception as exc:
+            final_status = RunStatus.errored
             await self._store.update_run_status(
                 run_id, RunStatus.errored, error=str(exc)
             )
             await self._publish(run_id, f"{kind.value}_errored", {"error": str(exc)})
             log.error("%s %s errored: %s", kind.value.capitalize(), run_id, exc)
         finally:
+            duration_s = time.time() - t_start
+            await self._store.update_run_metrics(run_id, duration_s=duration_s)
+            outcome, score = derive_from_status(final_status)
+            await self._store.upsert_run_outcome(run_id, outcome, score, "derived")
             self._seq.pop(run_id, None)

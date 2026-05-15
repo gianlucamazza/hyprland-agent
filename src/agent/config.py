@@ -48,8 +48,17 @@ class BrainConfig:
 
 
 @dataclass(frozen=True)
+class MemoryConfig:
+    enabled: bool = True
+    recall_k: int = 3
+    embedder_model: str = "BAAI/bge-m3"
+    filter_failure_in_recall: bool = True
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     brain: BrainConfig = field(default_factory=BrainConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
     audit_log: bool = False
     path: Path = CONFIG_PATH
 
@@ -110,9 +119,26 @@ def _brain_config(data: dict[str, Any]) -> BrainConfig:
     return BrainConfig(default=default, auto_order=auto_order, providers=enabled)
 
 
+def _memory_config(data: dict[str, Any]) -> MemoryConfig:
+    raw = data.get("memory", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("memory must be a mapping")
+    return MemoryConfig(
+        enabled=bool(raw.get("enabled", True)),
+        recall_k=int(raw.get("recall_k", 3)),
+        embedder_model=str(raw.get("embedder_model", "BAAI/bge-m3")),
+        filter_failure_in_recall=bool(raw.get("filter_failure_in_recall", True)),
+    )
+
+
 def load_config(path: Path = CONFIG_PATH) -> AgentConfig:
     data = _read_mapping(path)
     audit_log = data.get("audit_log", False)
     if not isinstance(audit_log, bool):
         raise ConfigError("audit_log must be true or false")
-    return AgentConfig(brain=_brain_config(data), audit_log=audit_log, path=path)
+    return AgentConfig(
+        brain=_brain_config(data),
+        memory=_memory_config(data),
+        audit_log=audit_log,
+        path=path,
+    )

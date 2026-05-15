@@ -7,14 +7,19 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agent.awareness.working import WorkingMemory
+from agent.awareness.world_context import snapshot as _world_snapshot
 from agent.brain.base import Brain
+from agent.brain.context import BrainContext
+from agent.introspection.self_model import SelfModel
 from agent.safety import confirm, killswitch
 from agent.safety.allowlist import is_allowed
-from agent.schemas import Action, ActionKind, ScreenState
+from agent.schemas import Action, ActionKind, ActionResult, ScreenState
 from agent.tools import hypr, input as inp, screen, terminal
 
 if TYPE_CHECKING:
     from agent.daemon.run_executor import RunContext
+    from agent.daemon.state import AppState
 
 log = logging.getLogger(__name__)
 
@@ -83,53 +88,82 @@ async def _ensure_keyboard_target_is_safe(ctx: "RunContext | None") -> bool:
     return False
 
 
-async def _execute_action(action: Action, ctx: "RunContext | None") -> None:
+async def _execute_action(action: Action, ctx: "RunContext | None") -> ActionResult:
     k = action.kind
     p = action.params
+    base = ActionResult(kind=k.value)
 
     if k == ActionKind.screenshot:
-        return  # brain handles its own screenshotting
+        return base  # brain handles its own screenshotting
 
     if k == ActionKind.terminal_command:
         run_id = ctx.run_id if ctx is not None else "local"
-        await terminal.run_command(
+        visible = bool(p.get("visible", True))
+        code, stdout, stderr = await terminal.run_command(
             p["command"],
             run_id=run_id,
             emit=ctx.emit if ctx else None,
             hold_s=float(p.get("hold_s", 0)),
+            visible=visible,
         )
-    elif k == ActionKind.type_text:
+        return ActionResult(
+            kind=k.value,
+            returncode=code,
+            stdout=stdout or None,
+            stderr=stderr or None,
+        )
+
+    if k == ActionKind.type_text:
         if not await _ensure_keyboard_target_is_safe(ctx):
-            return
+            return ActionResult(kind=k.value, blocked="control_terminal")
         await inp.type_text(p["text"])
-    elif k == ActionKind.key:
+        return base
+
+    if k == ActionKind.key:
         if not await _ensure_keyboard_target_is_safe(ctx):
-            return
+            return ActionResult(kind=k.value, blocked="control_terminal")
         await inp.key(p["combo"])
-    elif k == ActionKind.mouse_move:
+        return base
+
+    if k == ActionKind.mouse_move:
         await inp.move(p["x"], p["y"])
-    elif k == ActionKind.click:
+        return base
+
+    if k == ActionKind.click:
         await inp.click(p.get("button", "left"))
-    elif k == ActionKind.scroll:
+        return base
+
+    if k == ActionKind.scroll:
         await inp.scroll(p["amount"], p.get("horizontal", False))
-    elif k == ActionKind.focus_window:
-        await hypr.dispatch(f"focuswindow address:{p['address']}")
-    elif k == ActionKind.dispatch:
+        return base
+
+    if k == ActionKind.focus_window:
+        response = await hypr.dispatch(f"focuswindow address:{p['address']}")
+        return ActionResult(kind=k.value, dispatch_response=response)
+
+    if k == ActionKind.dispatch:
         cmd = p["cmd"]
         if confirm.is_destructive_dispatch(cmd):
             ok = await confirm.confirm(f"Hyprland dispatch: {cmd!r}")
             if not ok:
                 log.warning("User rejected dispatch %r", cmd)
-                return
-        await hypr.dispatch(cmd)
-    elif k == ActionKind.clipboard_copy:
+                return ActionResult(kind=k.value, rejected=cmd)
+        response = await hypr.dispatch(cmd)
+        return ActionResult(kind=k.value, dispatch_response=response)
+
+    if k == ActionKind.clipboard_copy:
         from agent.tools import clipboard
 
         await clipboard.write(p["text"])
-    elif k == ActionKind.clipboard_paste:
+        return base
+
+    if k == ActionKind.clipboard_paste:
         if not await _ensure_keyboard_target_is_safe(ctx):
-            return
+            return ActionResult(kind=k.value, blocked="control_terminal")
         await inp.key("ctrl+v")
+        return base
+
+    return base
 
 
 async def _build_state(task: str, ctx: "RunContext | None") -> tuple[ScreenState, bool]:
@@ -189,7 +223,33 @@ async def _build_state(task: str, ctx: "RunContext | None") -> tuple[ScreenState
     return state, True
 
 
-async def plan(task: str, brain: Brain, ctx: "RunContext | None" = None) -> None:
+async def _assemble_brain_context(
+    screen_state: ScreenState,
+    brain: Brain,
+    task: str,
+    app_state: "AppState | None" = None,
+) -> BrainContext:
+    brain_name = type(brain).__name__
+    self_model = SelfModel(brain_name=brain_name)
+    world = await _world_snapshot(
+        active_window=screen_state.active_window,
+        monitor_width=screen_state.width,
+        monitor_height=screen_state.height,
+        windows=screen_state.windows,
+    )
+    if app_state is not None:
+        from agent.learning.api import inject_context
+
+        return await inject_context(app_state, task, self_model, world)
+    return BrainContext(self_model=self_model, world=world, working=WorkingMemory())
+
+
+async def plan(
+    task: str,
+    brain: Brain,
+    ctx: "RunContext | None" = None,
+    app_state: "AppState | None" = None,
+) -> None:
     """Plan a task and record the proposed actions without executing them."""
 
     async def _emit(kind: str, payload: dict | None = None) -> None:
@@ -200,7 +260,8 @@ async def plan(task: str, brain: Brain, ctx: "RunContext | None" = None) -> None
     if not allowed:
         return
 
-    actions = await brain.decide(state, task)
+    brain_ctx = await _assemble_brain_context(state, brain, task, app_state)
+    actions = await brain.decide(state, task, brain_ctx)
     await _emit("actions", {"count": len(actions)})
 
     for action in actions:
@@ -210,7 +271,12 @@ async def plan(task: str, brain: Brain, ctx: "RunContext | None" = None) -> None
     log.info("Plan complete.")
 
 
-async def run(task: str, brain: Brain, ctx: "RunContext | None" = None) -> None:
+async def run(
+    task: str,
+    brain: Brain,
+    ctx: "RunContext | None" = None,
+    app_state: "AppState | None" = None,
+) -> None:
     """Execute a task. If *ctx* is provided, lifecycle events are emitted via it."""
 
     async def _emit(kind: str, payload: dict | None = None) -> None:
@@ -221,7 +287,8 @@ async def run(task: str, brain: Brain, ctx: "RunContext | None" = None) -> None:
     if not allowed:
         return
 
-    actions = await brain.decide(state, task)
+    brain_ctx = await _assemble_brain_context(state, brain, task, app_state)
+    actions = await brain.decide(state, task, brain_ctx)
     await _emit("actions", {"count": len(actions)})
 
     for action in actions:
@@ -232,7 +299,20 @@ async def run(task: str, brain: Brain, ctx: "RunContext | None" = None) -> None:
             return
         log.info("Execute: %s %s", action.kind, action.params)
         await _emit("action", {"kind": action.kind.value, "params": action.params})
-        await _execute_action(action, ctx)
+        result = await _execute_action(action, ctx)
+        brain_ctx.working.record(action.kind.value, action.params)
+        # only emit action_result when there is non-trivial data (not just kind)
+        if (
+            result.dispatch_response
+            or result.blocked
+            or result.rejected
+            or result.stdout
+            or result.stderr
+        ):
+            result_data = {
+                k: v for k, v in result.model_dump().items() if v is not None
+            }
+            await _emit("action_result", result_data)
         await asyncio.sleep(0.05)
 
     await _emit("done", {})
