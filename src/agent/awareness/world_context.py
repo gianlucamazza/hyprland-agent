@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -16,6 +16,7 @@ class WorldSnapshot:
     monitor_height: int
     window_count: int
     timestamp: float
+    integrations: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -26,6 +27,7 @@ class WorldSnapshot:
             "monitor_height": self.monitor_height,
             "window_count": self.window_count,
             "timestamp": self.timestamp,
+            "integrations": self.integrations,
         }
 
     def render_for_prompt(self) -> str:
@@ -41,6 +43,9 @@ class WorldSnapshot:
         lines.append(
             f"Display: {self.monitor_width}×{self.monitor_height}  |  Open windows: {self.window_count}"
         )
+        ready = [n for n, s in self.integrations.items() if s == "ready"]
+        if ready:
+            lines.append(f"Integrations available: {', '.join(sorted(ready))}")
         return "\n".join(lines)
 
 

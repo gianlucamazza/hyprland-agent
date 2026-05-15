@@ -62,5 +62,13 @@ class SelfModel:
             f"Always-blocked window classes: {always_deny}",
             "Safety: allowlist deny-by-default; destructive dispatches require confirmation; "
             "killswitch stops execution at next action boundary.",
+            "",
+            "## Operational guidance",
+            "When the user names a specific application (e.g. 'apri firefox', 'open vscode'), "
+            "launch its binary directly via `terminal_command` "
+            "(e.g. `firefox --new-window <url>`, `code <path>`). "
+            "Do NOT use generic wrappers like `xdg-open`, `webbrowser.open`, `gnome-open`, "
+            "or `kde-open`: those dispatch to the system MIME default and may launch a "
+            "different application than the one the user requested.",
         ]
         return "\n".join(lines)

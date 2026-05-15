@@ -12,7 +12,7 @@ Read `README.md` for prerequisites, setup, and user-facing docs. This file cover
 
 ```bash
 uv sync                      # install deps (Python >= 3.13, managed via uv)
-uv run pytest                # full test suite (310 tests)
+uv run pytest                # full test suite (338 tests)
 uv run pytest -m "not slow"  # fast suite (skips bge-m3 download)
 uv run pytest tests/test_orchestrator.py::test_name   # single test
 uv run agent daemon -v       # run daemon in foreground
@@ -22,6 +22,8 @@ uv run agent learning list skill           # list draft skills
 uv run agent learning approve skill <id>   # approve a skill
 scripts/install-local.sh       # install host runtime outside this checkout
 scripts/verify-local-install.sh # confirm systemd does not run from repo .venv
+agent-waybar --watch           # stream Waybar JSON (run after install)
+fuzzel-agent                   # fuzzel dmenu to re-run a recent task
 ```
 
 No Makefile, no ruff config in `pyproject.toml` despite `.ruff_cache/` being present. `pytest-asyncio` is in auto mode (`pyproject.toml:37`).
@@ -144,6 +146,27 @@ The orchestrator enriches every `BrainContext` via `learning/api.inject_context(
 - **bge-m3 model is ~600 MB** and downloaded lazily on first embed call to `~/.cache/fastembed`. Mark tests that need the real embedder with `@pytest.mark.slow`; stub it with `[[0.1]*1024]` for unit tests.
 - **`watcher_service.load_rules()`** merges `rules.yaml` and `learned_rules.yaml` with dedup by `(on, match)` key. Duplicate rules across both files are silently dropped.
 
+## Integrations (P5)
+
+Entry-points group `hyprland_agent.integrations` — third-party packages can register integrations by adding entries to this group. Built-in integrations live in `src/agent/integrations/`.
+
+**`IntegrationRegistry`** (`src/agent/integrations/__init__.py`): discovers integrations via `importlib.metadata.entry_points`, calls `setup()` on each, routes `ActionKind.notify` / `ActionKind.update_status` to all registered integrations via `handle()`. Lifecycle is tied to `AppState.open()` / `AppState.close()` in `src/agent/daemon/state.py`.
+
+**`CapabilitySpec`** declares what an integration can do (`action_kinds`, `context_keys`). Schema version is `INTEGRATIONS_API_VERSION = "1.0"` — major-version mismatch causes the integration to be skipped.
+
+**Built-in integrations:**
+
+| Module | Class | Role |
+| ------ | ----- | ---- |
+| `integrations/mako.py` | `MakoIntegration` | `notify-send` with app-name and urgency mapping |
+| `integrations/waybar.py` | `WaybarIntegration` | server-side no-op; client is `cli/waybar_module.py` |
+| `integrations/fuzzel.py` | `FuzzelIntegration` | binary probe; client is `cli/fuzzel_launcher.py` |
+| `integrations/idle.py` | `IdleIntegration` | D-Bus `org.freedesktop.ScreenSaver` → cancel active runs on lock |
+
+**Console scripts:** `agent-waybar` → `cli/waybar_module.py:main`; `fuzzel-agent` → `cli/fuzzel_launcher.py:main`. Both are thin async clients over the daemon socket.
+
+**Enabled integrations** are controlled by `config.yaml` `integrations.enabled` list. An empty list loads all discovered integrations. `idle` is intentionally excluded from the user's local config.
+
 ## Known test state
 
-`uv run pytest` → 310 passed. `uv run pytest -m "not slow"` skips embedder download tests. The Textual error-screen snapshot is tracked; inspect `snapshot_report.html` before intentionally updating it after TUI rendering changes.
+`uv run pytest` → 338 passed. `uv run pytest -m "not slow"` skips embedder download tests. The Textual error-screen snapshot is tracked; inspect `snapshot_report.html` before intentionally updating it after TUI rendering changes.

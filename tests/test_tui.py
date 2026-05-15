@@ -5,8 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from textual.app import App, ComposeResult
+from textual.widgets import Input
 
 from agent.tui.app import AgentApp, ErrorScreen
+from agent.tui.widgets.run_modal import RunModal
 
 
 # ── Smoke: daemon unavailable ────────────────────────────────────────────────
@@ -62,7 +65,9 @@ def test_tui_does_not_import_daemon() -> None:
         text=True,
         check=True,
     )
-    assert result.stdout.strip() == "[]", f"daemon modules imported: {result.stdout.strip()}"
+    assert result.stdout.strip() == "[]", (
+        f"daemon modules imported: {result.stdout.strip()}"
+    )
 
 
 # ── Snapshot: ErrorScreen layout ─────────────────────────────────────────────
@@ -81,3 +86,26 @@ async def _wait_for_error_screen(pilot) -> None:
     await pilot.pause(0.3)
 
 
+# ── RunModal: input accepts typed text ───────────────────────────────────────
+
+
+class _ModalHost(App[None]):
+    """Minimal host that immediately pushes RunModal without a daemon."""
+
+    async def on_mount(self) -> None:
+        await self.push_screen(RunModal())
+
+
+async def test_run_modal_input_accepts_text() -> None:
+    """RunModal #task-input must display characters as the user types."""
+    app = _ModalHost()
+    async with app.run_test(headless=True, size=(80, 24)) as pilot:
+        await pilot.pause(0.2)
+        assert isinstance(app.screen, RunModal), "RunModal should be the active screen"
+        inp = app.screen.query_one("#task-input", Input)
+        assert app.screen.focused is inp, (
+            "focus should land on #task-input via AUTO_FOCUS"
+        )
+        await pilot.press("h", "e", "l", "l", "o")
+        await pilot.pause(0.05)
+        assert inp.value == "hello", f"expected 'hello', got {inp.value!r}"

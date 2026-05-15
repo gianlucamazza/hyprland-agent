@@ -87,6 +87,9 @@ class ActionKind(str, Enum):
     dispatch = "dispatch"
     clipboard_copy = "clipboard_copy"
     clipboard_paste = "clipboard_paste"
+    # Integration-provided kinds
+    notify = "notify"
+    update_status = "update_status"
 
 
 class Action(BaseModel):

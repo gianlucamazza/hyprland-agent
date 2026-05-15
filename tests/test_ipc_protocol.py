@@ -223,6 +223,8 @@ def test_all_rpc_methods_have_values() -> None:
         "learning_approve",
         "learning_reject",
         "learning_explain",
+        "memory_search",
+        "memory_get",
     }
     actual = {m.value for m in RpcMethod}
     assert actual == expected

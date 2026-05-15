@@ -99,14 +99,14 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess:
     )
 
 
-def test_cli_windows_daemon_down_exits_nonzero() -> None:
-    result = _run_cli("windows")
+def test_cli_hypr_windows_daemon_down_exits_nonzero() -> None:
+    result = _run_cli("hypr", "windows")
     assert result.returncode != 0
     assert "daemon" in result.stderr.lower() or "not running" in result.stderr.lower()
 
 
-def test_cli_list_runs_daemon_down_exits_nonzero() -> None:
-    result = _run_cli("list-runs")
+def test_cli_runs_list_daemon_down_exits_nonzero() -> None:
+    result = _run_cli("runs", "list")
     assert result.returncode != 0
 
 

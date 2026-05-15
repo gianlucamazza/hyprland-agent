@@ -227,7 +227,7 @@ systemctl --user status hyprland-agent
 scripts/verify-local-install.sh
 ```
 
-`agent migrate-systemd` only rewrites the user unit. For a clean host runtime,
+`agent service install` only rewrites the user unit. For a clean host runtime,
 prefer `scripts/install-local.sh`, which installs outside the repository before
 restarting the daemon.
 
@@ -291,6 +291,10 @@ agent learning reject skill <id>       # discard
 # Health check and kill switch
 agent doctor
 agent stop
+
+# Integrations
+agent-waybar --watch          # stream Waybar JSON to stdout
+fuzzel-agent                  # pick and re-run a recent task via fuzzel
 ```
 
 ## Kill switch
@@ -395,6 +399,51 @@ After editing rules:
 agent rules reload
 ```
 
+## Integrations
+
+Integrations extend the daemon with desktop-ecosystem hooks. They are discovered
+via Python entry points (`hyprland_agent.integrations`) and controlled from
+`config.yaml`:
+
+```yaml
+integrations:
+  enabled: [mako, waybar, fuzzel]  # empty list = load all discovered
+  mako_app_name: hyprland-agent
+```
+
+### Built-in integrations
+
+| Integration | What it does |
+| ----------- | ------------ |
+| `mako`      | Sends desktop notifications via `notify-send` when the agent completes or errors |
+| `waybar`    | Provides `agent-waybar` — a process that streams Waybar-compatible JSON to stdout |
+| `fuzzel`    | Provides `fuzzel-agent` — picks and re-runs a recent task via `fuzzel --dmenu` |
+| `idle`      | Listens for `org.freedesktop.ScreenSaver` D-Bus signals; cancels active runs on lock |
+
+### Waybar setup
+
+Add to `~/.config/waybar/config`:
+
+```json
+"custom/agent": {
+    "exec": "agent-waybar --watch",
+    "return-type": "json",
+    "interval": "once",
+    "restart-interval": 5,
+    "on-click": "fuzzel-agent"
+}
+```
+
+### Mako styling
+
+Add to `~/.config/mako/config` to style agent notifications distinctly:
+
+```ini
+[app-name=hyprland-agent]
+border-color=#88c0d0
+default-timeout=5000
+```
+
 ## Self-learning
 
 The agent learns from its own run history. After a few successful runs of the same pattern, it proposes:
@@ -465,7 +514,7 @@ Opt-in JSONL audit logging is available when `audit_log: true` is set in:
 
 | Old                            | New                                                   |
 | ------------------------------ | ----------------------------------------------------- |
-| `hyprland-agent-watch.service` | `hyprland-agent.service`; run `agent migrate-systemd` |
+| `hyprland-agent-watch.service` | `hyprland-agent.service`; run `agent service install` |
 | JSONL as primary storage       | SQLite `runs.db`; JSONL is opt-in audit output        |
 | `RunSummary.dry_run: bool`     | `RunSummary.kind: RunKind` (`run`\|`plan`)            |
 | `agent dry-run`                | `agent plan`                                          |
@@ -483,8 +532,8 @@ uv run pytest
 Result:
 
 ```text
-310 tests collected
-310 passed
+338 tests collected
+338 passed
 ```
 
 The Textual error-screen snapshot is tracked under `tests/__snapshots__/`.

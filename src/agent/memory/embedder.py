@@ -1,4 +1,4 @@
-"""Lazy singleton text embedder backed by fastembed + BAAI/bge-m3."""
+"""Lazy singleton text embedder backed by fastembed + intfloat/multilingual-e5-large."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 EMBED_DIM = 1024
-_DEFAULT_MODEL = "BAAI/bge-m3"
+_DEFAULT_MODEL = "intfloat/multilingual-e5-large"
 
 
 class FastEmbedder:

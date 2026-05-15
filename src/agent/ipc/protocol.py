@@ -28,6 +28,8 @@ class RpcMethod(str, Enum):
     learning_approve = "learning_approve"
     learning_reject = "learning_reject"
     learning_explain = "learning_explain"
+    memory_search = "memory_search"
+    memory_get = "memory_get"
 
 
 class Topic(str, Enum):

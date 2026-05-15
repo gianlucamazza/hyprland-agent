@@ -51,7 +51,7 @@ class BrainConfig:
 class MemoryConfig:
     enabled: bool = True
     recall_k: int = 3
-    embedder_model: str = "BAAI/bge-m3"
+    embedder_model: str = "intfloat/multilingual-e5-large"
     filter_failure_in_recall: bool = True
 
 
@@ -65,10 +65,18 @@ class LearningConfig:
 
 
 @dataclass(frozen=True)
+class IntegrationsConfig:
+    enabled: tuple[str, ...] = ()  # empty = load all discovered
+    binary_overrides: dict[str, str] = field(default_factory=dict)
+    mako_app_name: str = "hyprland-agent"
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     brain: BrainConfig = field(default_factory=BrainConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     learning: LearningConfig = field(default_factory=LearningConfig)
+    integrations: IntegrationsConfig = field(default_factory=IntegrationsConfig)
     audit_log: bool = False
     path: Path = CONFIG_PATH
 
@@ -136,7 +144,7 @@ def _memory_config(data: dict[str, Any]) -> MemoryConfig:
     return MemoryConfig(
         enabled=bool(raw.get("enabled", True)),
         recall_k=int(raw.get("recall_k", 3)),
-        embedder_model=str(raw.get("embedder_model", "BAAI/bge-m3")),
+        embedder_model=str(raw.get("embedder_model", "intfloat/multilingual-e5-large")),
         filter_failure_in_recall=bool(raw.get("filter_failure_in_recall", True)),
     )
 
@@ -154,6 +162,33 @@ def _learning_config(data: dict[str, Any]) -> LearningConfig:
     )
 
 
+def _integrations_config(data: dict[str, Any]) -> IntegrationsConfig:
+    raw = data.get("integrations", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("integrations must be a mapping")
+    known_keys = {"enabled", "binary_overrides", "mako_app_name"}
+    for key in raw:
+        if key not in known_keys:
+            raise ConfigError(f"integrations.{key!r} is not a recognised key")
+
+    raw_enabled = raw.get("enabled", [])
+    if not isinstance(raw_enabled, list):
+        raise ConfigError("integrations.enabled must be a list of integration names")
+    enabled = tuple(str(e) for e in raw_enabled)
+
+    raw_overrides = raw.get("binary_overrides", {}) or {}
+    if not isinstance(raw_overrides, dict):
+        raise ConfigError("integrations.binary_overrides must be a mapping")
+    binary_overrides = {str(k): str(v) for k, v in raw_overrides.items()}
+
+    mako_app_name = str(raw.get("mako_app_name", "hyprland-agent"))
+    return IntegrationsConfig(
+        enabled=enabled,
+        binary_overrides=binary_overrides,
+        mako_app_name=mako_app_name,
+    )
+
+
 def load_config(path: Path = CONFIG_PATH) -> AgentConfig:
     data = _read_mapping(path)
     audit_log = data.get("audit_log", False)
@@ -163,6 +198,7 @@ def load_config(path: Path = CONFIG_PATH) -> AgentConfig:
         brain=_brain_config(data),
         memory=_memory_config(data),
         learning=_learning_config(data),
+        integrations=_integrations_config(data),
         audit_log=audit_log,
         path=path,
     )

@@ -167,6 +167,35 @@ async def _learning_explain(state: AppState, params: dict[str, Any]) -> dict[str
     return await explain(kind, str(proposal_id), state.store)
 
 
+async def _memory_search(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    query = params.get("query", "")
+    top_k = int(params.get("top_k", 5))
+    if not query:
+        raise ValueError("query is required")
+    episodes = await state.episodic.recall(query, k=top_k, filter_failure=False)
+    return {
+        "episodes": [
+            {
+                "id": ep.run_id,
+                "task": ep.task,
+                "outcome": ep.outcome,
+                "summary": ep.summary,
+                "context_class": ep.context_class,
+                "score": 1.0 - (ep.distance or 0.0),
+            }
+            for ep in episodes
+        ]
+    }
+
+
+async def _memory_get(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    episode_id = params.get("episode_id", "")
+    if not episode_id:
+        raise ValueError("episode_id is required")
+    episode = await state.store.get_episode(episode_id)
+    return {"episode": episode}
+
+
 async def _daemon_status(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
     active = await state.executor.active_run_ids()
     return {
@@ -195,6 +224,8 @@ _DISPATCH: dict[RpcMethod, Handler] = {
     RpcMethod.learning_approve: _learning_approve,
     RpcMethod.learning_reject: _learning_reject,
     RpcMethod.learning_explain: _learning_explain,
+    RpcMethod.memory_search: _memory_search,
+    RpcMethod.memory_get: _memory_get,
 }
 
 

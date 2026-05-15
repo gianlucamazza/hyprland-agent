@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select
 
@@ -38,45 +38,54 @@ class RunModal(ModalScreen[str | None]):
     """
 
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    AUTO_FOCUS = "#task-input"
     DEFAULT_CSS = """
     RunModal {
         align: center middle;
     }
-    RunModal > Grid {
-        grid-size: 2;
-        grid-gutter: 1 2;
+    RunModal > Vertical {
+        width: 72;
+        height: auto;
         padding: 1 2;
-        width: 70;
-        height: 14;
         border: double $accent;
         background: $surface;
     }
-    RunModal Label {
-        height: 1;
+    RunModal .row {
+        height: auto;
+        margin-bottom: 1;
+    }
+    RunModal .row > Label {
+        width: 8;
         content-align: right middle;
+        padding-top: 1;
+    }
+    RunModal #task-input, RunModal #brain-select {
+        width: 1fr;
     }
     RunModal #btn-row {
-        column-span: 2;
-        layout: horizontal;
-        align: right middle;
         height: 3;
+        align: right middle;
     }
-    RunModal Button {
+    RunModal #btn-row Button {
         margin: 0 1;
     }
     """
 
     def compose(self) -> ComposeResult:
-        with Grid():
-            yield Label("Task:")
-            yield Input(placeholder="Natural-language task description", id="task-input")
-            yield Label("Brain:")
-            yield Select(
-                _brain_options(),
-                id="brain-select",
-                value="auto",
-            )
-            with Grid(id="btn-row"):
+        with Vertical():
+            with Horizontal(classes="row"):
+                yield Label("Task:")
+                yield Input(
+                    placeholder="Natural-language task description", id="task-input"
+                )
+            with Horizontal(classes="row"):
+                yield Label("Brain:")
+                yield Select(
+                    _brain_options(),
+                    id="brain-select",
+                    value="auto",
+                )
+            with Horizontal(id="btn-row"):
                 yield Button("Plan", id="plan-btn")
                 yield Button("Run", variant="primary", id="run-btn")
                 yield Button("Cancel", id="cancel-btn")

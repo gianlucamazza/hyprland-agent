@@ -2,29 +2,22 @@
 
 from __future__ import annotations
 
-import asyncio
 import io
 
 from PIL import Image
 
 from agent.schemas import Window
 from agent.tools import hypr
+from agent.tools._proc import run as _proc_run
 
 
 async def _grim(*args: str) -> bytes:
-    proc = await asyncio.create_subprocess_exec(
-        "grim",
-        "-t",
-        "png",
-        *args,
-        "-",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+    result = await _proc_run(
+        ["grim", "-t", "png", *args, "-"], capture_stdout=True, timeout=10.0
     )
-    out, err = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"grim failed: {err.decode()}")
-    return out
+    if result.returncode != 0:
+        raise RuntimeError(f"grim failed: {result.stderr.decode()}")
+    return result.stdout
 
 
 async def full() -> bytes:

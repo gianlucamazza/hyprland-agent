@@ -5,16 +5,13 @@ from __future__ import annotations
 import asyncio
 import shlex
 
+from agent.tools._proc import run as _proc_run
+
 
 async def _run(*cmd: str) -> None:
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, err = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"{cmd[0]} failed: {err.decode()}")
+    result = await _proc_run(cmd, timeout=5.0)
+    if result.returncode != 0:
+        raise RuntimeError(f"{cmd[0]} failed: {result.stderr.decode()}")
 
 
 async def type_text(text: str) -> None:

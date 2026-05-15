@@ -1,6 +1,6 @@
 [project]
 name = "hyprland-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Agentic desktop controller for Hyprland / Wayland"
 requires-python = ">=3.13"
 dependencies = [
@@ -13,10 +13,19 @@ dependencies = [
   "typer>=0.25.1",
   "fastembed>=0.4",
   "sqlite-vec>=0.1.6",
+  "jeepney>=0.8",
 ]
 
 [project.scripts]
 agent = "agent.cli:app"
+agent-waybar = "agent.cli.waybar_module:main"
+fuzzel-agent = "agent.cli.fuzzel_launcher:main"
+
+[project.entry-points."hyprland_agent.integrations"]
+mako = "agent.integrations.mako:MakoIntegration"
+waybar = "agent.integrations.waybar:WaybarIntegration"
+fuzzel = "agent.integrations.fuzzel:FuzzelIntegration"
+idle = "agent.integrations.idle:IdleIntegration"
 
 [build-system]
 requires = ["hatchling"]

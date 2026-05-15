@@ -610,6 +610,20 @@ class RunStore:
         rows = conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
 
+    async def get_episode(self, run_id: str) -> dict | None:
+        """Return a single episode row by run_id, or None if not found."""
+        async with self._lock:
+            return await self._run_sync(self._do_get_episode, run_id)
+
+    def _do_get_episode(self, conn: sqlite3.Connection, run_id: str) -> dict | None:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT run_id, task, outcome, summary, context_class, actions_json, created_at"
+            " FROM episodes WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
     async def insert_reflection(
         self,
         run_id: str,

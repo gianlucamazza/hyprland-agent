@@ -89,7 +89,11 @@ async def _ensure_keyboard_target_is_safe(ctx: "RunContext | None") -> bool:
     return False
 
 
-async def _execute_action(action: Action, ctx: "RunContext | None") -> ActionResult:
+async def _execute_action(
+    action: Action,
+    ctx: "RunContext | None",
+    app_state: "AppState | None" = None,
+) -> ActionResult:
     k = action.kind
     p = action.params
     base = ActionResult(kind=k.value)
@@ -162,6 +166,13 @@ async def _execute_action(action: Action, ctx: "RunContext | None") -> ActionRes
         if not await _ensure_keyboard_target_is_safe(ctx):
             return ActionResult(kind=k.value, blocked="control_terminal")
         await inp.key("ctrl+v")
+        return base
+
+    if k in (ActionKind.notify, ActionKind.update_status):
+        if app_state is not None:
+            result = await app_state.integrations.handle(action)
+            if result is not None:
+                return result
         return base
 
     return base
@@ -239,6 +250,7 @@ async def _assemble_brain_context(
         windows=screen_state.windows,
     )
     if app_state is not None:
+        world.integrations = app_state.integrations.status()
         from agent.learning.api import inject_context
 
         return await inject_context(app_state, task, self_model, world)
@@ -311,7 +323,7 @@ async def run(
             except Exception:
                 pass
 
-        result = await _execute_action(action, ctx)
+        result = await _execute_action(action, ctx, app_state)
 
         if pre_hash is not None:
             try:

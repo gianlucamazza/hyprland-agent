@@ -2,26 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
+from agent.tools._proc import run as _proc_run
 
 
 async def read() -> str:
-    proc = await asyncio.create_subprocess_exec(
-        "wl-paste",
-        "--no-newline",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+    result = await _proc_run(
+        ["wl-paste", "--no-newline"], capture_stdout=True, timeout=5.0
     )
-    out, _ = await proc.communicate()
-    return out.decode()
+    return result.stdout.decode()
 
 
 async def write(text: str) -> None:
-    proc = await asyncio.create_subprocess_exec(
-        "wl-copy",
-        stdin=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, err = await proc.communicate(text.encode())
-    if proc.returncode != 0:
-        raise RuntimeError(f"wl-copy failed: {err.decode()}")
+    result = await _proc_run(["wl-copy"], stdin_data=text.encode(), timeout=5.0)
+    if result.returncode != 0:
+        raise RuntimeError(f"wl-copy failed: {result.stderr.decode()}")

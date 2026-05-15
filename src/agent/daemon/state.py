@@ -9,6 +9,7 @@ from agent.daemon.audit_log import AuditLog
 from agent.daemon.pubsub import PubSub
 from agent.daemon.run_executor import RunExecutor
 from agent.daemon.store import RunStore
+from agent.integrations import IntegrationRegistry
 from agent.learning.consumer import LearningConsumer
 from agent.learning.reflection import ReflectionEngine
 from agent.memory.embedder import FastEmbedder
@@ -23,6 +24,7 @@ class AppState:
         self.pubsub = PubSub()
         self.audit = AuditLog(enabled=self.config.audit_log)
         self.executor = RunExecutor(self.store, self.pubsub, self.audit)
+        self.integrations = IntegrationRegistry()
         self.rules: list[Rule] = []
         self.start_time: float = 0.0
 
@@ -36,6 +38,9 @@ class AppState:
         await self.store.open()
         await self.audit.open()
         self.executor.app_state = self
+        cfg = self.config.integrations
+        enabled = cfg.enabled if cfg.enabled else None
+        await self.integrations.load(self, enabled=enabled)
         if self.config.memory.enabled:
             self.learning = LearningConsumer(
                 self.pubsub, self.episodic, self.reflection
@@ -43,6 +48,7 @@ class AppState:
             await self.learning.open()
 
     async def close(self) -> None:
+        await self.integrations.teardown()
         if self.learning is not None:
             await self.learning.close()
         await self.executor.close()
