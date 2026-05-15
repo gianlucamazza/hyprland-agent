@@ -1,0 +1,66 @@
+"""SelfModel — semantic memory: what the agent can do, its limits, its safety constraints."""
+
+from __future__ import annotations
+
+import time
+from pathlib import Path
+from typing import Any
+
+from agent.schemas import ActionKind
+
+_MAX_LOOP = 20
+_RUN_TIMEOUT = 300
+_MAX_HOLD_S = 30
+_ALWAYS_DENY = {"1password", "_1password", "keepassxc", "gnome-keyring"}
+
+
+class SelfModel:
+    """Static introspection: capabilities, limits, safety constraints, active brain."""
+
+    def __init__(
+        self, brain_name: str = "unknown", start_time: float | None = None
+    ) -> None:
+        self._brain = brain_name
+        self._start_time = start_time or time.time()
+
+    def capabilities(self) -> list[str]:
+        return [k.value for k in ActionKind]
+
+    def limits(self) -> dict[str, Any]:
+        return {
+            "max_iterations": _MAX_LOOP,
+            "run_timeout_s": _RUN_TIMEOUT,
+            "max_hold_s": _MAX_HOLD_S,
+        }
+
+    def safety_constraints(self) -> dict[str, Any]:
+        allowlist_path = Path.home() / ".config" / "hyprland-agent" / "allowlist.yaml"
+        return {
+            "always_blocked_classes": sorted(_ALWAYS_DENY),
+            "allowlist_path": str(allowlist_path),
+            "allowlist_exists": allowlist_path.exists(),
+            "killswitch_file": str(Path.home() / ".cache" / "hyprland-agent" / "STOP"),
+        }
+
+    def active_brain(self) -> str:
+        return self._brain
+
+    def uptime_s(self) -> float:
+        return time.time() - self._start_time
+
+    def render_for_prompt(self) -> str:
+        limits = self.limits()
+        safety = self.safety_constraints()
+        caps = ", ".join(self.capabilities())
+        always_deny = ", ".join(safety["always_blocked_classes"])
+        lines = [
+            "## Agent self-model",
+            f"Brain: {self._brain}",
+            f"Available actions: {caps}",
+            f"Loop cap: {limits['max_iterations']} iterations, "
+            f"run timeout: {limits['run_timeout_s']}s",
+            f"Always-blocked window classes: {always_deny}",
+            "Safety: allowlist deny-by-default; destructive dispatches require confirmation; "
+            "killswitch stops execution at next action boundary.",
+        ]
+        return "\n".join(lines)

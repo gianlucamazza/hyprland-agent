@@ -100,6 +100,73 @@ async def _disarm_killswitch(state: AppState, params: dict[str, Any]) -> dict[st
     return {"ok": True}
 
 
+async def _record_feedback(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    run_id = params.get("run_id", "")
+    kind = params.get("kind", "")
+    comment = params.get("comment")
+    if not run_id or not kind:
+        raise ValueError("run_id and kind are required")
+    feedback_id = await state.store.insert_feedback(run_id, kind, comment)
+    from agent.learning.outcome import feedback_to_outcome
+
+    outcome, score = feedback_to_outcome(kind)
+    if outcome != "unknown":
+        await state.store.upsert_run_outcome(
+            run_id, outcome, score, "explicit", rationale=comment
+        )
+    return {"feedback_id": feedback_id, "outcome": outcome}
+
+
+async def _runs_analytics(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    days = int(params.get("days", 7))
+    return await state.store.list_analytics(days)
+
+
+async def _learning_list(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    from agent.learning.api import list_proposals
+
+    kind = params.get("kind", "skill")
+    status = params.get("status") or None
+    items = await list_proposals(kind, status, state.store)
+    return {"items": items}
+
+
+async def _learning_approve(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    from agent.learning.api import approve
+
+    kind = params.get("kind", "")
+    proposal_id = params.get("id", "")
+    if not kind or not proposal_id:
+        raise ValueError("kind and id are required")
+    result = await approve(kind, str(proposal_id), state.store)
+    if kind == "rule":
+        from agent.daemon.watcher_service import load_rules
+
+        state.rules = await load_rules()
+    return result
+
+
+async def _learning_reject(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    from agent.learning.api import reject
+
+    kind = params.get("kind", "")
+    proposal_id = params.get("id", "")
+    reason = params.get("reason")
+    if not kind or not proposal_id:
+        raise ValueError("kind and id are required")
+    return await reject(kind, str(proposal_id), state.store, reason=reason)
+
+
+async def _learning_explain(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
+    from agent.learning.api import explain
+
+    kind = params.get("kind", "")
+    proposal_id = params.get("id", "")
+    if not kind or not proposal_id:
+        raise ValueError("kind and id are required")
+    return await explain(kind, str(proposal_id), state.store)
+
+
 async def _daemon_status(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
     active = await state.executor.active_run_ids()
     return {
@@ -122,6 +189,12 @@ _DISPATCH: dict[RpcMethod, Handler] = {
     RpcMethod.arm_killswitch: _arm_killswitch,
     RpcMethod.disarm_killswitch: _disarm_killswitch,
     RpcMethod.daemon_status: _daemon_status,
+    RpcMethod.record_feedback: _record_feedback,
+    RpcMethod.runs_analytics: _runs_analytics,
+    RpcMethod.learning_list: _learning_list,
+    RpcMethod.learning_approve: _learning_approve,
+    RpcMethod.learning_reject: _learning_reject,
+    RpcMethod.learning_explain: _learning_explain,
 }
 
 

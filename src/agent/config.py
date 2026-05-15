@@ -56,9 +56,19 @@ class MemoryConfig:
 
 
 @dataclass(frozen=True)
+class LearningConfig:
+    enabled: bool = True
+    mining_interval_s: int = 300
+    skill_extraction_enabled: bool = True
+    rule_mining_enabled: bool = True
+    allowlist_mining_enabled: bool = True
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     brain: BrainConfig = field(default_factory=BrainConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
+    learning: LearningConfig = field(default_factory=LearningConfig)
     audit_log: bool = False
     path: Path = CONFIG_PATH
 
@@ -131,6 +141,19 @@ def _memory_config(data: dict[str, Any]) -> MemoryConfig:
     )
 
 
+def _learning_config(data: dict[str, Any]) -> LearningConfig:
+    raw = data.get("learning", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("learning must be a mapping")
+    return LearningConfig(
+        enabled=bool(raw.get("enabled", True)),
+        mining_interval_s=int(raw.get("mining_interval_s", 300)),
+        skill_extraction_enabled=bool(raw.get("skill_extraction_enabled", True)),
+        rule_mining_enabled=bool(raw.get("rule_mining_enabled", True)),
+        allowlist_mining_enabled=bool(raw.get("allowlist_mining_enabled", True)),
+    )
+
+
 def load_config(path: Path = CONFIG_PATH) -> AgentConfig:
     data = _read_mapping(path)
     audit_log = data.get("audit_log", False)
@@ -139,6 +162,7 @@ def load_config(path: Path = CONFIG_PATH) -> AgentConfig:
     return AgentConfig(
         brain=_brain_config(data),
         memory=_memory_config(data),
+        learning=_learning_config(data),
         audit_log=audit_log,
         path=path,
     )

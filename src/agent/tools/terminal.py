@@ -11,6 +11,7 @@ EmitFn = Callable[[str, dict], Awaitable[None]]
 
 _DEFAULT_TIMEOUT = 300.0
 _MAX_HOLD_S = 30.0
+_CAPTURE_CAP = 8192  # bytes kept from stdout/stderr tail
 
 
 async def run_command(
@@ -20,14 +21,35 @@ async def run_command(
     emit: EmitFn | None = None,
     timeout: float = _DEFAULT_TIMEOUT,
     hold_s: float = 0.0,
-) -> int:
-    """Run a shell command in a dedicated visible terminal owned by this run."""
+    visible: bool = True,
+) -> tuple[int, str, str]:
+    """Run a shell command.
+
+    visible=True (default): spawns a dedicated foot terminal window.
+    visible=False: runs headlessly via shell, captures stdout/stderr (8 KB cap).
+    Returns (returncode, stdout, stderr). stdout/stderr are empty when visible=True.
+    """
+    if visible:
+        return await _run_visible(
+            command, run_id=run_id, emit=emit, timeout=timeout, hold_s=hold_s
+        )
+    return await _run_capture(command, run_id=run_id, emit=emit, timeout=timeout)
+
+
+async def _run_visible(
+    command: str,
+    *,
+    run_id: str,
+    emit: EmitFn | None = None,
+    timeout: float,
+    hold_s: float,
+) -> tuple[int, str, str]:
     title = f"hyprland-agent:{run_id}"
     hold_s = _clamp_hold_s(hold_s)
     if emit is not None:
         await emit(
             "terminal_started",
-            {"title": title, "command": command, "hold_s": hold_s},
+            {"title": title, "command": command, "hold_s": hold_s, "visible": True},
         )
 
     proc = await asyncio.create_subprocess_exec(
@@ -53,10 +75,67 @@ async def run_command(
         raise
 
     if emit is not None:
-        await emit("terminal_exited", {"title": title, "returncode": code})
+        await emit(
+            "terminal_exited", {"title": title, "returncode": code, "visible": True}
+        )
     if code != 0:
         raise RuntimeError(f"terminal command exited with status {code}")
-    return code
+    return code, "", ""
+
+
+async def _run_capture(
+    command: str,
+    *,
+    run_id: str,
+    emit: EmitFn | None = None,
+    timeout: float,
+) -> tuple[int, str, str]:
+    title = f"hyprland-agent:{run_id}"
+    if emit is not None:
+        await emit(
+            "terminal_started",
+            {"title": title, "command": command, "hold_s": 0, "visible": False},
+        )
+
+    proc = await asyncio.create_subprocess_shell(
+        command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        if emit is not None:
+            await emit("terminal_timed_out", {"title": title, "timeout_s": timeout})
+        raise
+    except asyncio.CancelledError:
+        proc.kill()
+        await proc.wait()
+        if emit is not None:
+            await emit("terminal_cancelled", {"title": title})
+        raise
+
+    stdout = stdout_b.decode(errors="replace")[-_CAPTURE_CAP:]
+    stderr = stderr_b.decode(errors="replace")[-_CAPTURE_CAP:]
+    code = proc.returncode or 0
+
+    if emit is not None:
+        await emit(
+            "terminal_exited",
+            {
+                "title": title,
+                "returncode": code,
+                "stdout": stdout,
+                "stderr": stderr,
+                "visible": False,
+            },
+        )
+
+    if code != 0:
+        raise RuntimeError(f"command exited with status {code}: {stderr[:200]}")
+    return code, stdout, stderr
 
 
 def _clamp_hold_s(value: float) -> float:

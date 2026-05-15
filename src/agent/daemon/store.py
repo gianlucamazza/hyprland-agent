@@ -100,6 +100,8 @@ class RunStore:
             self._apply_v2_migration(conn)
         if user_ver < 3:
             self._apply_v3_migration(conn)
+        if user_ver < 4:
+            self._apply_v4_migration(conn)
 
     def _apply_v2_migration(self, conn: sqlite3.Connection) -> None:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
@@ -653,6 +655,305 @@ class RunStore:
             (polarity, limit),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def _apply_v4_migration(self, conn: sqlite3.Connection) -> None:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS skills (
+                skill_id      TEXT PRIMARY KEY,
+                name          TEXT NOT NULL,
+                description   TEXT NOT NULL,
+                actions_json  TEXT NOT NULL,
+                params_schema TEXT,
+                source_run_id TEXT REFERENCES runs(run_id),
+                created_at    REAL NOT NULL,
+                last_used_at  REAL,
+                status        TEXT NOT NULL DEFAULT 'draft'
+            );
+            CREATE INDEX IF NOT EXISTS idx_skills_status ON skills(status);
+
+            CREATE TABLE IF NOT EXISTS skill_outcomes (
+                skill_id TEXT NOT NULL REFERENCES skills(skill_id) ON DELETE CASCADE,
+                run_id   TEXT NOT NULL REFERENCES runs(run_id)    ON DELETE CASCADE,
+                outcome  TEXT NOT NULL,
+                ts       REAL NOT NULL,
+                PRIMARY KEY (skill_id, run_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS learned_rules (
+                rule_id      TEXT PRIMARY KEY,
+                yaml         TEXT NOT NULL,
+                confidence   REAL NOT NULL,
+                hit_count    INTEGER NOT NULL DEFAULT 0,
+                source_runs  TEXT NOT NULL,
+                status       TEXT NOT NULL DEFAULT 'proposed',
+                proposed_at  REAL NOT NULL,
+                decided_at   REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_learned_rules_status ON learned_rules(status);
+
+            CREATE TABLE IF NOT EXISTS allowlist_proposals (
+                proposal_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                app_class   TEXT NOT NULL,
+                title_pat   TEXT NOT NULL DEFAULT '*',
+                hit_count   INTEGER NOT NULL DEFAULT 1,
+                last_seen   REAL NOT NULL,
+                status      TEXT NOT NULL DEFAULT 'pending'
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_allowlist_proposal
+                ON allowlist_proposals(app_class, title_pat);
+        """)
+        if self._vec_ok:
+            conn.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS skill_vecs USING vec0("
+                "skill_id TEXT PRIMARY KEY,"
+                "embedding FLOAT[1024]"
+                ")"
+            )
+        conn.execute("PRAGMA user_version=4")
+        conn.commit()
+
+    # ------------------------------------------------------------------
+    # Skill library (P4)
+    # ------------------------------------------------------------------
+
+    async def insert_skill(
+        self,
+        skill_id: str,
+        name: str,
+        description: str,
+        actions_json: str,
+        source_run_id: str | None = None,
+    ) -> None:
+        async with self._lock:
+            await self._run_sync(
+                self._do_insert_skill,
+                skill_id,
+                name,
+                description,
+                actions_json,
+                source_run_id,
+            )
+
+    def _do_insert_skill(
+        self,
+        conn: sqlite3.Connection,
+        skill_id: str,
+        name: str,
+        description: str,
+        actions_json: str,
+        source_run_id: str | None,
+    ) -> None:
+        conn.execute(
+            "INSERT OR REPLACE INTO skills"
+            " (skill_id, name, description, actions_json, source_run_id, created_at, status)"
+            " VALUES (?, ?, ?, ?, ?, ?, 'draft')",
+            (skill_id, name, description, actions_json, source_run_id, time.time()),
+        )
+        conn.commit()
+
+    async def insert_skill_vec(self, skill_id: str, embedding: list[float]) -> None:
+        if not self._vec_ok:
+            return
+        async with self._lock:
+            await self._run_vec_sync(self._do_insert_skill_vec, skill_id, embedding)
+
+    def _do_insert_skill_vec(
+        self, conn: sqlite3.Connection, skill_id: str, embedding: list[float]
+    ) -> None:
+        import struct
+
+        blob = struct.pack(f"{len(embedding)}f", *embedding)
+        conn.execute(
+            "INSERT OR REPLACE INTO skill_vecs (skill_id, embedding) VALUES (?, ?)",
+            (skill_id, blob),
+        )
+        conn.commit()
+
+    async def update_skill_status(self, skill_id: str, status: str) -> None:
+        async with self._lock:
+            await self._run_sync(self._do_update_skill_status, skill_id, status)
+
+    def _do_update_skill_status(
+        self, conn: sqlite3.Connection, skill_id: str, status: str
+    ) -> None:
+        conn.execute("UPDATE skills SET status=? WHERE skill_id=?", (status, skill_id))
+        conn.commit()
+
+    async def record_skill_outcome(
+        self, skill_id: str, run_id: str, outcome: str
+    ) -> None:
+        async with self._lock:
+            await self._run_sync(
+                self._do_record_skill_outcome, skill_id, run_id, outcome
+            )
+
+    def _do_record_skill_outcome(
+        self, conn: sqlite3.Connection, skill_id: str, run_id: str, outcome: str
+    ) -> None:
+        conn.execute(
+            "INSERT OR REPLACE INTO skill_outcomes (skill_id, run_id, outcome, ts) VALUES (?,?,?,?)",
+            (skill_id, run_id, outcome, time.time()),
+        )
+        conn.commit()
+
+    async def list_skills(
+        self, status: str | None = None, limit: int = 50
+    ) -> list[dict]:
+        return await self._run_sync(self._do_list_skills, status, limit)
+
+    def _do_list_skills(
+        self, conn: sqlite3.Connection, status: str | None, limit: int
+    ) -> list[dict]:
+        conn.row_factory = sqlite3.Row
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM skills WHERE status=? ORDER BY created_at DESC LIMIT ?",
+                (status, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM skills ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    async def query_skills_by_vec(
+        self, embedding: list[float], k: int = 5, status: str = "approved"
+    ) -> list[dict]:
+        if not self._vec_ok:
+            return []
+        return await self._run_vec_sync(
+            self._do_query_skills_by_vec, embedding, k, status
+        )
+
+    def _do_query_skills_by_vec(
+        self, conn: sqlite3.Connection, embedding: list[float], k: int, status: str
+    ) -> list[dict]:
+        import struct
+
+        blob = struct.pack(f"{len(embedding)}f", *embedding)
+        sql = (
+            "SELECT s.*, vec_distance_cosine(sv.embedding, ?) AS dist"
+            " FROM skill_vecs sv"
+            " JOIN skills s ON s.skill_id = sv.skill_id"
+            " WHERE s.status = ?"
+            " ORDER BY dist LIMIT ?"
+        )
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, (blob, status, k)).fetchall()
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Learned rules (P4)
+    # ------------------------------------------------------------------
+
+    async def insert_learned_rule(
+        self, rule_id: str, yaml_str: str, confidence: float, source_runs: str
+    ) -> None:
+        async with self._lock:
+            await self._run_sync(
+                self._do_insert_learned_rule, rule_id, yaml_str, confidence, source_runs
+            )
+
+    def _do_insert_learned_rule(
+        self,
+        conn: sqlite3.Connection,
+        rule_id: str,
+        yaml_str: str,
+        confidence: float,
+        source_runs: str,
+    ) -> None:
+        conn.execute(
+            "INSERT OR IGNORE INTO learned_rules"
+            " (rule_id, yaml, confidence, source_runs, status, proposed_at)"
+            " VALUES (?,?,?,?,'proposed',?)",
+            (rule_id, yaml_str, confidence, source_runs, time.time()),
+        )
+        conn.commit()
+
+    async def list_learned_rules(self, status: str | None = None) -> list[dict]:
+        return await self._run_sync(self._do_list_learned_rules, status)
+
+    def _do_list_learned_rules(
+        self, conn: sqlite3.Connection, status: str | None
+    ) -> list[dict]:
+        conn.row_factory = sqlite3.Row
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM learned_rules WHERE status=? ORDER BY proposed_at DESC",
+                (status,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM learned_rules ORDER BY proposed_at DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    async def update_learned_rule_status(self, rule_id: str, status: str) -> None:
+        async with self._lock:
+            await self._run_sync(self._do_update_rule_status, rule_id, status)
+
+    def _do_update_rule_status(
+        self, conn: sqlite3.Connection, rule_id: str, status: str
+    ) -> None:
+        conn.execute(
+            "UPDATE learned_rules SET status=?, decided_at=? WHERE rule_id=?",
+            (status, time.time(), rule_id),
+        )
+        conn.commit()
+
+    # ------------------------------------------------------------------
+    # Allowlist proposals (P4)
+    # ------------------------------------------------------------------
+
+    async def upsert_allowlist_proposal(self, app_class: str, title_pat: str) -> None:
+        async with self._lock:
+            await self._run_sync(
+                self._do_upsert_allowlist_proposal, app_class, title_pat
+            )
+
+    def _do_upsert_allowlist_proposal(
+        self, conn: sqlite3.Connection, app_class: str, title_pat: str
+    ) -> None:
+        conn.execute(
+            "INSERT INTO allowlist_proposals (app_class, title_pat, hit_count, last_seen, status)"
+            " VALUES (?, ?, 1, ?, 'pending')"
+            " ON CONFLICT(app_class, title_pat) DO UPDATE SET"
+            "   hit_count = hit_count + 1,"
+            "   last_seen = excluded.last_seen"
+            "   WHERE status = 'pending'",
+            (app_class, title_pat, time.time()),
+        )
+        conn.commit()
+
+    async def list_allowlist_proposals(self, status: str = "pending") -> list[dict]:
+        return await self._run_sync(self._do_list_allowlist_proposals, status)
+
+    def _do_list_allowlist_proposals(
+        self, conn: sqlite3.Connection, status: str
+    ) -> list[dict]:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM allowlist_proposals WHERE status=? ORDER BY hit_count DESC",
+            (status,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    async def update_allowlist_proposal_status(
+        self, proposal_id: int, status: str
+    ) -> None:
+        async with self._lock:
+            await self._run_sync(
+                self._do_update_allowlist_proposal_status, proposal_id, status
+            )
+
+    def _do_update_allowlist_proposal_status(
+        self, conn: sqlite3.Connection, proposal_id: int, status: str
+    ) -> None:
+        conn.execute(
+            "UPDATE allowlist_proposals SET status=? WHERE proposal_id=?",
+            (status, proposal_id),
+        )
+        conn.commit()
 
     # ------------------------------------------------------------------
     # Internal helpers

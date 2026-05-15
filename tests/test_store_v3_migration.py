@@ -23,7 +23,7 @@ async def test_v3_migration_bumps_user_version(
 ) -> None:
     with sqlite3.connect(str(tmp_path / "runs.db")) as conn:
         ver = conn.execute("PRAGMA user_version").fetchone()[0]
-    assert ver == 3
+    assert ver >= 3  # v4 is applied after v3 in the same open() call
 
 
 async def test_episodes_table_exists(fresh_store: RunStore, tmp_path: Path) -> None:

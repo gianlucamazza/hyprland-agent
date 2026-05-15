@@ -22,6 +22,12 @@ class RpcMethod(str, Enum):
     arm_killswitch = "arm_killswitch"
     disarm_killswitch = "disarm_killswitch"
     daemon_status = "daemon_status"
+    record_feedback = "record_feedback"
+    runs_analytics = "runs_analytics"
+    learning_list = "learning_list"
+    learning_approve = "learning_approve"
+    learning_reject = "learning_reject"
+    learning_explain = "learning_explain"
 
 
 class Topic(str, Enum):

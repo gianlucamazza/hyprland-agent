@@ -15,7 +15,7 @@ from agent.schemas import Action, ActionKind, Monitor, Window
 class _Brain:
     called = False
 
-    async def decide(self, state: Any, task: str) -> list[Any]:
+    async def decide(self, state: Any, task: str, ctx: Any) -> list[Any]:
         self.called = True
         return []
 
@@ -96,7 +96,9 @@ async def test_plan_records_actions_without_executing(
     monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
     monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
     monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
-    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
+    monkeypatch.setattr(
+        "agent.orchestrator.screen.full", AsyncMock(return_value=b"png")
+    )
     monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
     type_text = AsyncMock()
     key = AsyncMock()
@@ -156,9 +158,11 @@ async def test_run_executes_terminal_command_in_owned_terminal(
     monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
     monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
     monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
-    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
+    monkeypatch.setattr(
+        "agent.orchestrator.screen.full", AsyncMock(return_value=b"png")
+    )
     monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
-    run_command = AsyncMock(return_value=0)
+    run_command = AsyncMock(return_value=(0, "", ""))
     monkeypatch.setattr("agent.orchestrator.terminal.run_command", run_command)
 
     await run("write file", brain, ctx=RunContext(run_id="run-1", _emit_fn=emit))
@@ -168,6 +172,7 @@ async def test_run_executes_terminal_command_in_owned_terminal(
         run_id="run-1",
         emit=ANY,
         hold_s=3.0,
+        visible=True,
     )
     assert [event[0] for event in events] == [
         "start",
@@ -209,7 +214,9 @@ async def test_keyboard_action_blocked_in_control_terminal(
     monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
     monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
     monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
-    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
+    monkeypatch.setattr(
+        "agent.orchestrator.screen.full", AsyncMock(return_value=b"png")
+    )
     monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
     monkeypatch.setattr("agent.orchestrator._process_tree_contains", lambda *_: True)
     type_text = AsyncMock()

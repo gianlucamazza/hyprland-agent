@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import fnmatch
+import threading
+from collections import Counter
 from pathlib import Path
 
 import yaml
@@ -13,6 +15,18 @@ _CONFIG_PATH = Path.home() / ".config" / "hyprland-agent" / "allowlist.yaml"
 
 # Classes always blocked regardless of allowlist
 _ALWAYS_DENY = {"1password", "_1password", "keepassxc", "gnome-keyring"}
+
+# Thread-safe miss counter for AllowlistMiner to drain periodically
+_miss_counter: Counter[tuple[str, str]] = Counter()
+_miss_lock = threading.Lock()
+
+
+def drain_misses() -> dict[tuple[str, str], int]:
+    """Atomically drain and return the miss counter."""
+    with _miss_lock:
+        result = dict(_miss_counter)
+        _miss_counter.clear()
+    return result
 
 
 def _load_rules() -> list[dict]:
@@ -30,6 +44,8 @@ def is_allowed(window: Window) -> bool:
     rules = _load_rules()
     if not rules:
         # Empty allowlist = deny all (safe default)
+        with _miss_lock:
+            _miss_counter[(window.app_class, window.title)] += 1
         return False
 
     for rule in rules:
@@ -39,6 +55,10 @@ def is_allowed(window: Window) -> bool:
             window.app_class.lower(), class_pat.lower()
         ) and fnmatch.fnmatch(window.title.lower(), title_pat.lower()):
             return True
+
+    # Miss: record for allowlist mining (skip _ALWAYS_DENY — those are intentional)
+    with _miss_lock:
+        _miss_counter[(window.app_class, window.title)] += 1
     return False
 
 

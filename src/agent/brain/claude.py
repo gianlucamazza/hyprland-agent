@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from agent.brain.oauth_bridge import anthropic_client
 from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
+
+if TYPE_CHECKING:
+    from agent.brain.context import BrainContext
 
 _DEFAULT_MODEL = "claude-opus-4-7"
 _MAX_TOKENS = 4096
@@ -187,11 +190,18 @@ class ClaudeBrain:
         self.model = model or os.environ.get("ANTHROPIC_MODEL", _DEFAULT_MODEL)
         self.max_tokens = max_tokens
 
-    async def decide(self, state: ScreenState, task: str) -> list[Action]:
+    async def decide(
+        self, state: ScreenState, task: str, ctx: "BrainContext"
+    ) -> list[Action]:
         client = anthropic_client()
         scaled_w = int(state.width * _SCALE)
         scaled_h = int(state.height * _SCALE)
         png = screen.resize(state.screenshot_png, scale=_SCALE)
+        system_prompt = ctx.render_system_prompt()
+        preamble = ctx.render_user_preamble()
+        user_text = f"Task: {task}"
+        if preamble:
+            user_text = f"{preamble}\n\n{user_text}"
         messages: list[dict[str, Any]] = [
             {
                 "role": "user",
@@ -204,15 +214,7 @@ class ClaudeBrain:
                             "data": _png_b64(png),
                         },
                     },
-                    {
-                        "type": "text",
-                        "text": (
-                            f"Task: {task}\n\n"
-                            "For terminal or shell commands, use the terminal_command "
-                            "tool instead of typing into the focused terminal. Use "
-                            "hold_s only when the task asks to keep it visible."
-                        ),
-                    },
+                    {"type": "text", "text": user_text},
                 ],
             }
         ]
@@ -224,6 +226,7 @@ class ClaudeBrain:
                 client.messages.create,
                 model=self.model,
                 max_tokens=self.max_tokens,
+                system=system_prompt,
                 tools=tools,
                 messages=messages,
             )

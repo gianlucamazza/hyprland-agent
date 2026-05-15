@@ -181,3 +181,23 @@ class RunSummary(BaseModel):
 
 class RunRecord(RunSummary):
     events: list[RunEventRecord] = Field(default_factory=list)
+
+
+class ActionResult(BaseModel):
+    """Typed result returned by orchestrator._execute_action."""
+
+    kind: str
+    dispatch_response: str | None = None
+    stdout: str | None = None
+    stderr: str | None = None
+    returncode: int | None = None
+    blocked: str | None = None
+    rejected: str | None = None
+    pre_hash: str | None = None
+    post_hash: str | None = None
+
+    def is_blocked(self) -> bool:
+        return self.blocked is not None
+
+    def is_rejected(self) -> bool:
+        return self.rejected is not None

@@ -14,8 +14,10 @@ from agent.ipc.constants import SOCKET_PATH
 app = typer.Typer(no_args_is_help=True, help="Hyprland desktop agent")
 config_app = typer.Typer(help="Configuration commands (no daemon required)")
 rules_app = typer.Typer(help="Rule management")
+learning_app = typer.Typer(help="Learning inbox: skills, rules, allowlist proposals")
 app.add_typer(config_app, name="config")
 app.add_typer(rules_app, name="rules")
+app.add_typer(learning_app, name="learning")
 
 _BrainOpt = Annotated[
     Optional[str],
@@ -393,6 +395,167 @@ def bind_killswitch() -> None:
 # ──────────────────────────────────────────────────────────
 # agent rules sub-commands
 # ──────────────────────────────────────────────────────────
+
+
+@app.command()
+def feedback(
+    run_id: Annotated[str, typer.Argument(help="Run ID to rate")],
+    up: Annotated[bool, typer.Option("--up", help="Thumbs up (success)")] = False,
+    down: Annotated[bool, typer.Option("--down", help="Thumbs down (failure)")] = False,
+    comment: Annotated[
+        Optional[str], typer.Option("--comment", "-c", help="Free-text note")
+    ] = None,
+) -> None:
+    """Record explicit feedback for a run."""
+    if not up and not down and not comment:
+        typer.echo("Specify --up, --down, or --comment.", err=True)
+        raise typer.Exit(1)
+    kind = "thumbs_up" if up else ("thumbs_down" if down else "comment")
+
+    async def _do() -> None:
+        from agent.client.connection import connect
+        from agent.ipc.protocol import RpcMethod
+
+        async with connect(SOCKET_PATH) as c:
+            result = await c.request(
+                RpcMethod.record_feedback,
+                {"run_id": run_id, "kind": kind, "comment": comment},
+            )
+        typer.echo(
+            f"outcome={result.get('outcome', '?')}  feedback_id={result.get('feedback_id', '?')}"
+        )
+
+    _run(_do())
+
+
+@app.command(name="runs-analytics")
+def runs_analytics(
+    days: Annotated[
+        int, typer.Option("--days", "-d", help="Lookback window in days")
+    ] = 7,
+) -> None:
+    """Show outcome analytics for recent runs."""
+
+    async def _do() -> None:
+        from agent.client.connection import connect
+        from agent.ipc.protocol import RpcMethod
+
+        async with connect(SOCKET_PATH) as c:
+            result = await c.request(RpcMethod.runs_analytics, {"days": days})
+
+        total = result.get("total_runs", 0)
+        outcomes = result.get("outcomes", {})
+        failures = result.get("top_failure_tasks", [])
+
+        typer.echo(f"Last {days} day(s) — {total} run(s) tracked")
+        if outcomes:
+            typer.echo("\nOutcome distribution:")
+            for outcome, count in outcomes.items():
+                pct = count * 100 // total if total else 0
+                typer.echo(f"  {outcome:10s}: {count:4d}  ({pct}%)")
+        if failures:
+            typer.echo("\nTop failing tasks:")
+            for f in failures[:5]:
+                typer.echo(f"  [{f['count']:3d}x] {f['task'][:60]}")
+
+    _run(_do())
+
+
+@learning_app.command("list")
+def learning_list(
+    kind: Annotated[
+        str, typer.Argument(help="Proposal kind: skill | rule | allowlist")
+    ] = "skill",
+    status: Annotated[
+        Optional[str], typer.Option("--status", "-s", help="Filter by status")
+    ] = None,
+) -> None:
+    """List learning proposals (skills, rules, or allowlist entries)."""
+    import json
+
+    async def _do() -> None:
+        from agent.client.connection import connect
+        from agent.ipc.protocol import RpcMethod
+
+        async with connect(SOCKET_PATH) as c:
+            result = await c.request(
+                RpcMethod.learning_list, {"kind": kind, "status": status}
+            )
+        items = result.get("items", [])
+        if not items:
+            typer.echo(f"No {kind} proposals found.")
+            return
+        for item in items:
+            typer.echo(json.dumps(item, default=str))
+
+    _run(_do())
+
+
+@learning_app.command("approve")
+def learning_approve(
+    kind: Annotated[str, typer.Argument(help="skill | rule | allowlist")],
+    proposal_id: Annotated[str, typer.Argument(help="Proposal ID")],
+) -> None:
+    """Approve a learning proposal."""
+
+    async def _do() -> None:
+        from agent.client.connection import connect
+        from agent.ipc.protocol import RpcMethod
+
+        async with connect(SOCKET_PATH) as c:
+            result = await c.request(
+                RpcMethod.learning_approve, {"kind": kind, "id": proposal_id}
+            )
+        typer.echo(
+            f"Approved {result.get('kind')} {result.get('id')} → {result.get('status')}"
+        )
+
+    _run(_do())
+
+
+@learning_app.command("reject")
+def learning_reject(
+    kind: Annotated[str, typer.Argument(help="skill | rule | allowlist")],
+    proposal_id: Annotated[str, typer.Argument(help="Proposal ID")],
+    reason: Annotated[
+        Optional[str], typer.Option("--reason", "-r", help="Rejection reason")
+    ] = None,
+) -> None:
+    """Reject a learning proposal."""
+
+    async def _do() -> None:
+        from agent.client.connection import connect
+        from agent.ipc.protocol import RpcMethod
+
+        async with connect(SOCKET_PATH) as c:
+            result = await c.request(
+                RpcMethod.learning_reject,
+                {"kind": kind, "id": proposal_id, "reason": reason},
+            )
+        typer.echo(f"Rejected {result.get('kind')} {result.get('id')}")
+
+    _run(_do())
+
+
+@learning_app.command("explain")
+def learning_explain(
+    kind: Annotated[str, typer.Argument(help="skill | rule | allowlist")],
+    proposal_id: Annotated[str, typer.Argument(help="Proposal ID")],
+) -> None:
+    """Show a detailed explanation of a learning proposal."""
+    import json
+
+    async def _do() -> None:
+        from agent.client.connection import connect
+        from agent.ipc.protocol import RpcMethod
+
+        async with connect(SOCKET_PATH) as c:
+            result = await c.request(
+                RpcMethod.learning_explain, {"kind": kind, "id": proposal_id}
+            )
+        typer.echo(json.dumps(result, indent=2, default=str))
+
+    _run(_do())
 
 
 @rules_app.command("reload")

@@ -10,12 +10,15 @@ import base64
 import json
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from openai import AsyncOpenAI
 
 from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
+
+if TYPE_CHECKING:
+    from agent.brain.context import BrainContext
 
 _SCALE = 0.5  # screenshot resize factor; coordinates scaled back up before dispatch
 _MAX_LOOP = 20  # max tool-use iterations per decide() call
@@ -371,18 +374,20 @@ class OpenAICompatibleBrain:
             client_kwargs["base_url"] = base_url
         self._client = AsyncOpenAI(**client_kwargs)
 
-    async def decide(self, state: ScreenState, task: str) -> list[Action]:
+    async def decide(
+        self, state: ScreenState, task: str, ctx: "BrainContext"
+    ) -> list[Action]:
         scaled_w = int(state.width * _SCALE)
         scaled_h = int(state.height * _SCALE)
         png = screen.resize(state.screenshot_png, scale=_SCALE)
         system_msg = (
-            f"You control a {scaled_w}x{scaled_h} desktop screenshot. "
-            "Use the provided tools to complete the task. "
-            "Coordinates are in the scaled image space. "
-            "For terminal or shell commands, use terminal_command instead of "
-            "typing into the focused terminal. Use terminal_command.hold_s only "
-            "when the task asks to keep the terminal visible for debugging."
+            ctx.render_system_prompt()
+            + f"\n\nDisplay: {scaled_w}x{scaled_h}. Coordinates are in scaled image space."
         )
+        preamble = ctx.render_user_preamble()
+        user_text = f"Task: {task}"
+        if preamble:
+            user_text = f"{preamble}\n\n{user_text}"
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_msg},
             {
@@ -392,7 +397,7 @@ class OpenAICompatibleBrain:
                         "type": "image_url",
                         "image_url": {"url": f"data:image/png;base64,{_png_b64(png)}"},
                     },
-                    {"type": "text", "text": f"Task: {task}"},
+                    {"type": "text", "text": user_text},
                 ],
             },
         ]

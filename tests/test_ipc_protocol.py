@@ -217,6 +217,12 @@ def test_all_rpc_methods_have_values() -> None:
         "arm_killswitch",
         "disarm_killswitch",
         "daemon_status",
+        "record_feedback",
+        "runs_analytics",
+        "learning_list",
+        "learning_approve",
+        "learning_reject",
+        "learning_explain",
     }
     actual = {m.value for m in RpcMethod}
     assert actual == expected

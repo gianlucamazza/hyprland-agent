@@ -14,6 +14,7 @@ from agent.schemas import Rule
 log = logging.getLogger(__name__)
 
 _RULES_PATH = Path.home() / ".config" / "hyprland-agent" / "rules.yaml"
+_LEARNED_RULES_PATH = Path.home() / ".config" / "hyprland-agent" / "learned_rules.yaml"
 
 _RULES_TEMPLATE = """\
 # Hyprland Agent — watch rules
@@ -44,14 +45,32 @@ async def load_rules() -> list[Rule]:
 
     try:
         data = yaml.safe_load(_RULES_PATH.read_text()) or {}
-        raw_rules = data.get("rules") or []
-        rules: list[Rule] = []
+        raw_rules = list(data.get("rules") or [])
+
+        # Merge learned_rules.yaml (approved rules only)
+        if _LEARNED_RULES_PATH.exists():
+            try:
+                learned_data = yaml.safe_load(_LEARNED_RULES_PATH.read_text()) or {}
+                raw_rules.extend(learned_data.get("rules") or [])
+            except Exception as exc:
+                log.warning("Failed to load learned_rules.yaml: %s", exc)
+
+        # Dedup by 'on' + 'match' signature
+        seen: set[str] = set()
+        deduped: list[dict] = []
         for raw in raw_rules:
+            key = str((raw.get("on"), str(raw.get("match", {}))))
+            if key not in seen:
+                seen.add(key)
+                deduped.append(raw)
+
+        rules: list[Rule] = []
+        for raw in deduped:
             try:
                 rules.append(Rule.from_dict(raw))
             except Exception as exc:
                 log.warning("Skipping invalid rule %r: %s", raw, exc)
-        log.info("Loaded %d rule(s) from %s", len(rules), _RULES_PATH)
+        log.info("Loaded %d rule(s) (%s + learned)", len(rules), _RULES_PATH)
         return rules
     except Exception as exc:
         log.error("Failed to load rules from %s: %s", _RULES_PATH, exc)

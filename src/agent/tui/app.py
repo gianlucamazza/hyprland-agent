@@ -19,6 +19,7 @@ from agent.client.errors import DaemonUnavailable
 from agent.ipc.constants import SOCKET_PATH
 from agent.ipc.protocol import RpcMethod, Topic
 from agent.tui.widgets.events_pane import EventsPane
+from agent.tui.widgets.learning_pane import LearningPane
 from agent.tui.widgets.log_pane import LogPane
 from agent.tui.widgets.run_detail import RunDetail
 from agent.tui.widgets.run_list import RunList
@@ -99,6 +100,7 @@ class AgentApp(App[None]):
         Binding("ctrl+r", "new_run", "New run"),
         Binding("ctrl+k", "killswitch", "Stop all"),
         Binding("ctrl+l", "reload_rules", "Reload rules"),
+        Binding("ctrl+i", "learning_inbox", "Learning inbox"),
         Binding("ctrl+q", "quit", "Quit"),
     ]
     DEFAULT_CSS = """
@@ -145,6 +147,7 @@ class AgentApp(App[None]):
             with Vertical(id="right"):
                 yield RunDetail()
                 yield LogPane()
+                yield LearningPane()
         yield StatusBar()
         yield Footer()
 
@@ -232,5 +235,33 @@ class AgentApp(App[None]):
             result = await self._conn.request(RpcMethod.reload_rules)
             n = result.get("rules_count", 0)
             self.notify(f"Reloaded {n} rule(s)")
+        except Exception as exc:
+            self.notify(str(exc), severity="error")
+
+    async def action_learning_inbox(self) -> None:
+        if self._conn is None:
+            self.notify("Daemon not connected", severity="error")
+            return
+        try:
+            pane = self.query_one(LearningPane)
+        except Exception:
+            self.notify("Learning pane not available", severity="warning")
+            return
+        try:
+            skills = (
+                await self._conn.request(RpcMethod.learning_list, {"kind": "skill"})
+            ).get("items", [])
+            rules = (
+                await self._conn.request(RpcMethod.learning_list, {"kind": "rule"})
+            ).get("items", [])
+            allowlist = (
+                await self._conn.request(RpcMethod.learning_list, {"kind": "allowlist"})
+            ).get("items", [])
+            pane.load_skills(skills)
+            pane.load_rules(rules)
+            pane.load_allowlist(allowlist)
+            self.notify(
+                f"Loaded: {len(skills)} skills, {len(rules)} rules, {len(allowlist)} allowlist"
+            )
         except Exception as exc:
             self.notify(str(exc), severity="error")
