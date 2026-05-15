@@ -12,11 +12,14 @@ Read `README.md` for prerequisites, setup, and user-facing docs. This file cover
 
 ```bash
 uv sync                      # install deps (Python >= 3.13, managed via uv)
-uv run pytest                # full test suite (180 tests)
+uv run pytest                # full test suite (310 tests)
+uv run pytest -m "not slow"  # fast suite (skips bge-m3 download)
 uv run pytest tests/test_orchestrator.py::test_name   # single test
 uv run agent daemon -v       # run daemon in foreground
 uv run agent doctor          # health check (binaries, sockets, credentials)
 uv run agent plan "<task>"   # plan actions without executing
+uv run agent learning list skill           # list draft skills
+uv run agent learning approve skill <id>   # approve a skill
 scripts/install-local.sh       # install host runtime outside this checkout
 scripts/verify-local-install.sh # confirm systemd does not run from repo .venv
 ```
@@ -46,14 +49,20 @@ agent run "<task>"
 ```
 
 **Module map:**
+
 - `src/agent/ipc/` — shared NDJSON wire protocol (Pydantic discriminated union, 1 MiB frame cap)
-- `src/agent/daemon/` — server, run_executor, watcher_service, pubsub, SQLite RunStore, rule_runner
+- `src/agent/daemon/` — server, run_executor, watcher_service, pubsub, SQLite RunStore (v4), rule_runner
 - `src/agent/client/` — async RPC client
-- `src/agent/brain/` — LLM providers + router + Claude Code OAuth bridge
+- `src/agent/brain/` — LLM providers + router + Claude Code OAuth bridge; `brain/context.py` assembles `BrainContext` injected into every LLM call
 - `src/agent/tools/` — Hyprland IPC (native socket, not `hyprctl` subprocess), screen capture, input, clipboard, events
-- `src/agent/safety/` — allowlist, confirmation gate, killswitch
-- `src/agent/tui/` — Textual monitoring TUI
-- `src/agent/schemas.py` — all Pydantic models (Action, ScreenState, RunSummary, …)
+- `src/agent/safety/` — allowlist (deny-by-default + miss counter), confirmation gate, killswitch
+- `src/agent/tui/` — Textual monitoring TUI; `widgets/learning_pane.py` is the Ctrl+I learning inbox
+- `src/agent/schemas.py` — all Pydantic models (Action, ScreenState, RunSummary, ActionResult, …)
+- `src/agent/awareness/` — `WorkingMemory` (per-run action log), `WorldSnapshot` (active windows + focused)
+- `src/agent/introspection/` — `SelfModel` (capabilities, constraints, version)
+- `src/agent/memory/` — `FastEmbedder` (BAAI/bge-m3, lazy singleton, ONNX CPU), `EpisodicMemory` (ingest + recall), `EpisodicIngestor`
+- `src/agent/learning/` — `LearningConsumer` (single Topic.runs subscriber), `ReflectionEngine`, `SkillLibrary`, `RuleMiner`, `AllowlistMiner`, `api.py` (proposals CRUD + approval side-effects)
+- `src/agent/awareness/meta_cognition.py` — `LoopDetector` (ring buffer, repeat_threshold=3), `PostActionVerifier` (dHash pre/post screenshot), `StuckError`
 
 ## Multi-provider design
 
@@ -65,18 +74,59 @@ Provider keys are read **only by the daemon process** and never cross the IPC so
 
 ## Configuration & paths
 
-- `~/.config/hyprland-agent/` — `allowlist.yaml`, `rules.yaml`, `env`, optional `config.yaml` (`brain` provider policy and `audit_log: true` JSONL audit)
-- `~/.cache/hyprland-agent/` — `runs.db` (SQLite WAL), `STOP` (killswitch flag, polled every 100ms)
+- `~/.config/hyprland-agent/` — `allowlist.yaml`, `rules.yaml`, `learned_rules.yaml` (approved rules appended here by `learning approve rule`), `env`, optional `config.yaml`
+- `~/.cache/hyprland-agent/` — `runs.db` (SQLite WAL, schema v4), `STOP` (killswitch flag, polled every 100ms)
 - `$XDG_RUNTIME_DIR/hyprland-agent.sock` — daemon RPC socket, mode 0600
 - `~/.config/systemd/user/hyprland-agent.service` — installed by `agent migrate-systemd`
 - `HYPRLAND_INSTANCE_SIGNATURE` env var is **required at runtime** (used to locate Hyprland sockets in `tools/hypr.py`)
 - `.env.example` is the canonical list of provider env vars
+
+`config.yaml` knobs added in P2/P4:
+
+```yaml
+memory:
+  enabled: true # episodic memory + recall (BAAI/bge-m3)
+  recall_k: 3 # top-k episodes injected into BrainContext
+  embedder_model: "BAAI/bge-m3"
+  filter_failure_in_recall: true
+
+learning:
+  enabled: true # LearningConsumer task in daemon
+  mining_interval_s: 300 # rule/allowlist mining interval
+  skill_extraction_enabled: true
+  rule_mining_enabled: true
+  allowlist_mining_enabled: true
+```
+
+**DB schema versions**: v2 (outcomes, feedback, action_outcomes) → v3 (episodes, episode_vecs, reflections) → v4 (skills, skill_vecs, skill_outcomes, learned_rules, allowlist_proposals). All migrations are applied in sequence in `_init_db`. vec0 (`sqlite-vec`) is loaded per-connection in `_run_vec_sync`.
 
 ## Hyprland integration
 
 `tools/hypr.py` talks to Hyprland over native Unix sockets (`.socket.sock` for commands, `.socket2.sock` for events), not by spawning `hyprctl`. `daemon/watcher_service.py` fans events into the `hypr_events` pubsub topic; `daemon/rule_runner.py` matches `rules.yaml` and executes `dispatch` / `log` / `notify` / `run` actions. `run` actions are `shlex.split`-parsed, run with a whitelisted env, and reject destructive first tokens (`rm`, `sudo`, `shutdown`, etc.).
 
 Input is **not** routed through Hyprland: keyboard via `wtype`, mouse via `ydotool` (needs `input` group + `ydotool.service`).
+
+## Self-learning pipeline (P2–P4)
+
+The orchestrator enriches every `BrainContext` via `learning/api.inject_context()`:
+
+1. **Episodic recall** (`memory/episodic.py`): top-3 past runs by cosine similarity (bge-m3, sqlite-vec). If the embedder model isn't downloaded yet, recall silently returns `[]`.
+2. **Negative reflections** (`learning/reflection.py`): rule-based lessons from failed/stuck/errored runs, stored in `reflections` table, injected into the prompt.
+3. **Skill suggestions** (`learning/skills.py`): approved skills ranked by task similarity — surfaced in `BrainContext` once a skill is approved via `agent learning approve skill <id>`.
+
+**LearningConsumer** is a single asyncio.Task subscribing to `Topic.runs`. On every `run_finished` event it dispatches to `EpisodicMemory.ingest()` + `ReflectionEngine.reflect()`. No N-subscriber fan-out.
+
+**Loop detection**: `LoopDetector` (window=6, repeat_threshold=3) in the orchestrator run loop. Detects identical `(action_kind, params_json)` repeated ≥3 times → raises `StuckError` → `RunStatus.aborted`.
+
+**Post-action verification**: `PostActionVerifier` takes a dHash (8×8 Pillow `tobytes()`) before and after visual actions (click, mouse_move, scroll, focus_window, dispatch_hypr). Identical hash → `result.warnings.append("no visual change")`.
+
+**Learning inbox** (`agent learning {list,approve,reject,explain}`): proposals are never auto-approved. Approval side-effects:
+
+- `skill` → UPDATE `skills.status = 'approved'` in DB
+- `rule` → append YAML to `learned_rules.yaml` + daemon `reload_rules`
+- `allowlist` → append entry to `allowlist.yaml`
+
+**Safety invariant preserved**: `_ALWAYS_DENY` is hardcoded and cannot be bypassed by any learning path. `is_allowed()` reads only YAML files, not DB proposals.
 
 ## Gotchas
 
@@ -85,14 +135,15 @@ Input is **not** routed through Hyprland: keyboard via `wtype`, mouse via `ydoto
 - **Run hard timeout is 300s** (`_RUN_TIMEOUT` in `daemon/run_executor.py`). Long screen tasks abort with `RunStatus.errored`.
 - **Screenshot is downscaled to 0.5×** before sending to the brain; the brain's coords are scaled back up before dispatch. Coordinate translation lives in **two places** — `claude.py`'s `_computer_action_to_actions` and `openai_brain.py`'s `_sc()` helper. Keep them in parity when adding new action kinds.
 - **Key normalization** (`tools/input.py`): the LLM uses friendly names (`enter`, `esc`, `pageup`, `super`) which are mapped to `wtype` X11 names (`Return`, `Escape`, `Prior`). Modifiers are sent with `-M` and released in reverse order with `-m`.
-- **Terminal commands** use `terminal_command` and `tools/terminal.py`, not
-  `type_text` + `Return` into the focused terminal. `hold_s` is only for visible
-  debug/test runs and is capped at 30 seconds.
+- **Terminal commands** use `terminal_command` and `tools/terminal.py`, not `type_text` + `Return` into the focused terminal. `hold_s` is only for visible debug/test runs and is capped at 30 seconds.
 - **Killswitch is edge-triggered**: the `STOP` file flag is consumed by `disarm()` after detection to avoid log spam. `agent stop` always writes the file flag, then also sends RPC if the daemon is reachable.
 - **Allowlist defaults to deny-all**. Password-manager class names (`1password`, `_1password`, `keepassxc`, `gnome-keyring`) are always blocked regardless of the allowlist.
 - **NDJSON frame size cap is 1 MiB** (`ipc/constants.py`). Protocol version 1.0; major-version mismatches are rejected.
 - **Provider enablement is config-driven**. Explicit `--brain openai` or `--brain claude` fails if that provider is disabled in `config.yaml`; `auto` skips disabled or uncredentialed providers.
+- **sqlite-vec loaded per-connection**: `_run_vec_sync` calls `_load_vec0(conn)` on every invocation. `_run_sync` does NOT load vec0. Do not call vec queries through `_run_sync` or they will silently return empty results.
+- **bge-m3 model is ~600 MB** and downloaded lazily on first embed call to `~/.cache/fastembed`. Mark tests that need the real embedder with `@pytest.mark.slow`; stub it with `[[0.1]*1024]` for unit tests.
+- **`watcher_service.load_rules()`** merges `rules.yaml` and `learned_rules.yaml` with dedup by `(on, match)` key. Duplicate rules across both files are silently dropped.
 
 ## Known test state
 
-`uv run pytest` → 180 passed. The Textual error-screen snapshot is tracked; inspect `snapshot_report.html` before intentionally updating it after TUI rendering changes.
+`uv run pytest` → 310 passed. `uv run pytest -m "not slow"` skips embedder download tests. The Textual error-screen snapshot is tracked; inspect `snapshot_report.html` before intentionally updating it after TUI rendering changes.

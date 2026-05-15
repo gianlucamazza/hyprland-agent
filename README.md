@@ -261,17 +261,32 @@ agent screenshot -o /tmp/screen.png
 # Stream Hyprland events
 agent events
 
-# Run history
+# Run history and analytics
 agent list-runs
 agent list-runs --limit 50
 agent get-run <run-id>
+agent runs-analytics --days 7
+
+# Explicit feedback (improves episodic memory quality)
+agent feedback <run-id> --up
+agent feedback <run-id> --down --comment "wrong window focused"
 
 # Daemon status and monitoring
 agent status
-agent tui
+agent tui          # Ctrl+I opens the Learning Inbox
 
 # Watcher rules
 agent rules reload
+
+# Learning inbox: review and approve what the agent has learned
+agent learning list skill              # draft skill candidates
+agent learning list rule               # proposed watch rules
+agent learning list allowlist          # allowlist entry proposals
+agent learning explain skill <id>      # see what the skill does
+agent learning approve skill <id>      # activate a skill
+agent learning approve rule <id>       # write rule to learned_rules.yaml
+agent learning approve allowlist <id>  # write entry to allowlist.yaml
+agent learning reject skill <id>       # discard
 
 # Health check and kill switch
 agent doctor
@@ -380,6 +395,31 @@ After editing rules:
 agent rules reload
 ```
 
+## Self-learning
+
+The agent learns from its own run history. After a few successful runs of the same pattern, it proposes:
+
+- **Skills** — reusable action sequences extracted from successful runs.
+- **Watch rules** — Hyprland event → action pairs that recur enough to automate.
+- **Allowlist entries** — windows that the agent tried to control but was denied.
+
+All proposals require explicit human approval. Nothing is activated automatically.
+
+```bash
+# Review what the agent has learned
+agent learning list skill
+agent learning list rule
+agent learning list allowlist
+
+# Approve or reject individual proposals
+agent learning approve skill <id>
+agent learning reject rule <id> --reason "too broad"
+```
+
+In the TUI, press **Ctrl+I** to open the Learning Inbox.
+
+Episodic memory (past runs) is used to inject relevant context into every new task. The first embed call downloads `BAAI/bge-m3` (~600 MB) to `~/.cache/fastembed`; subsequent calls are instant.
+
 ## Run storage
 
 Runs are stored in SQLite at:
@@ -443,8 +483,8 @@ uv run pytest
 Result:
 
 ```text
-180 tests collected
-180 passed
+310 tests collected
+310 passed
 ```
 
 The Textual error-screen snapshot is tracked under `tests/__snapshots__/`.
