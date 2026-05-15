@@ -6,10 +6,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+from agent.config import DEFAULT_MAX_ITER, DEFAULT_RUN_TIMEOUT
 from agent.schemas import ActionKind
 
-_MAX_LOOP = 20
-_RUN_TIMEOUT = 300
+_MAX_LOOP = DEFAULT_MAX_ITER
+_RUN_TIMEOUT = int(DEFAULT_RUN_TIMEOUT)
 _MAX_HOLD_S = 30
 _ALWAYS_DENY = {"1password", "_1password", "keepassxc", "gnome-keyring"}
 
