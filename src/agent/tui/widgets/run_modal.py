@@ -27,7 +27,9 @@ def _brain_options() -> list[tuple[str, str]]:
 
         providers = selectable_providers()
     except Exception:
-        providers = ["claude", "openai", "moonshot", "groq", "together", "zai", "qwen"]
+        from agent.config import KNOWN_PROVIDERS
+
+        providers = list(KNOWN_PROVIDERS)
     return [("Auto", "auto"), *[(_LABELS[p], p) for p in providers]]
 
 
@@ -75,9 +77,7 @@ class RunModal(ModalScreen[str | None]):
         with Vertical():
             with Horizontal(classes="row"):
                 yield Label("Task:")
-                yield Input(
-                    placeholder="Natural-language task description", id="task-input"
-                )
+                yield Input(placeholder="Natural-language task description", id="task-input")
             with Horizontal(classes="row"):
                 yield Label("Brain:")
                 yield Select(
@@ -100,9 +100,7 @@ class RunModal(ModalScreen[str | None]):
             return
         brain_val = self.query_one("#brain-select", Select).value
         brain = str(brain_val) if brain_val is not Select.BLANK else "auto"
-        method = (
-            RpcMethod.plan_task if event.button.id == "plan-btn" else RpcMethod.run_task
-        )
+        method = RpcMethod.plan_task if event.button.id == "plan-btn" else RpcMethod.run_task
         conn = self.app._conn  # type: ignore[attr-defined]
         try:
             result = await conn.request(

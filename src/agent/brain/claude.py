@@ -14,10 +14,12 @@ from agent.tools import hypr, screen
 if TYPE_CHECKING:
     from agent.brain.context import BrainContext
 
+from agent.config import DEFAULT_MAX_ITER
+
 _DEFAULT_MODEL = "claude-opus-4-7"
 _MAX_TOKENS = 4096
 _SCALE = 0.5  # screenshot resize factor; coordinates are scaled back up before dispatch
-_MAX_LOOP = 20  # max tool-use iterations per decide() call
+_MAX_LOOP = DEFAULT_MAX_ITER
 
 _CUSTOM_TOOLS: list[dict[str, Any]] = [
     {
@@ -63,8 +65,7 @@ _CUSTOM_TOOLS: list[dict[str, Any]] = [
     {
         "name": "dispatch_hypr",
         "description": (
-            "Queue a raw Hyprland dispatch command "
-            "(e.g. 'workspace 2', 'movetoworkspace 3')."
+            "Queue a raw Hyprland dispatch command (e.g. 'workspace 2', 'movetoworkspace 3')."
         ),
         "input_schema": {
             "type": "object",
@@ -97,8 +98,7 @@ async def _handle_custom(name: str, inp: dict[str, Any]) -> tuple[str, list[Acti
     if name == "list_windows":
         wins = await hypr.clients()
         lines = [
-            f"{w.address} [{w.app_class}] {w.title!r} at ({w.x},{w.y}) {w.w}x{w.h}"
-            for w in wins
+            f"{w.address} [{w.app_class}] {w.title!r} at ({w.x},{w.y}) {w.w}x{w.h}" for w in wins
         ]
         return "\n".join(lines) or "(no windows)", []
     if name == "terminal_command":
@@ -116,9 +116,7 @@ async def _handle_custom(name: str, inp: dict[str, Any]) -> tuple[str, list[Acti
             Action(kind=ActionKind.focus_window, params={"address": inp["address"]})
         ]
     if name == "dispatch_hypr":
-        return "dispatch queued", [
-            Action(kind=ActionKind.dispatch, params={"cmd": inp["cmd"]})
-        ]
+        return "dispatch queued", [Action(kind=ActionKind.dispatch, params={"cmd": inp["cmd"]})]
     return "unknown tool", []
 
 
@@ -160,9 +158,7 @@ def _computer_action_to_actions(
         x, y = _sc(action.get("coordinate", [0, 0]))
         return [Action(kind=ActionKind.mouse_move, params={"x": x, "y": y})]
     if at == "type":
-        return [
-            Action(kind=ActionKind.type_text, params={"text": action.get("text", "")})
-        ]
+        return [Action(kind=ActionKind.type_text, params={"text": action.get("text", "")})]
     if at == "key":
         return [Action(kind=ActionKind.key, params={"combo": action.get("key", "")})]
     if at == "scroll":
@@ -190,9 +186,7 @@ class ClaudeBrain:
         self.model = model or os.environ.get("ANTHROPIC_MODEL", _DEFAULT_MODEL)
         self.max_tokens = max_tokens
 
-    async def decide(
-        self, state: ScreenState, task: str, ctx: "BrainContext"
-    ) -> list[Action]:
+    async def decide(self, state: ScreenState, task: str, ctx: BrainContext) -> list[Action]:
         client = anthropic_client()
         scaled_w = int(state.width * _SCALE)
         scaled_h = int(state.height * _SCALE)
@@ -251,9 +245,7 @@ class ClaudeBrain:
                             }
                         )
                     else:
-                        result_text, actions = await _handle_custom(
-                            block.name, block.input
-                        )
+                        result_text, actions = await _handle_custom(block.name, block.input)
                         all_actions.extend(actions)
                         tool_results.append(
                             {

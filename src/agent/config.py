@@ -13,7 +13,9 @@ CONFIG_PATH = CONFIG_DIR / "config.yaml"
 
 KNOWN_PROVIDERS = ("claude", "openai", "moonshot", "groq", "together", "zai", "qwen")
 DEFAULT_AUTO_ORDER = ("claude", "openai", "moonshot", "groq", "together", "zai", "qwen")
-_ALIASES = {
+
+# Public alias map: user-facing name → canonical provider key.
+BRAIN_ALIASES: dict[str, str] = {
     "claude": "claude",
     "openai": "openai",
     "gpt": "openai",
@@ -29,6 +31,10 @@ _ALIASES = {
     "qwen": "qwen",
     "dashscope": "qwen",
 }
+
+# Default tunables — single source of truth; imported by brain and daemon modules.
+DEFAULT_MAX_ITER: int = 20  # max LLM tool-use iterations per run
+DEFAULT_RUN_TIMEOUT: float = 300.0  # seconds before a run is force-aborted
 
 
 class ConfigError(ValueError):
@@ -84,7 +90,7 @@ class AgentConfig:
 def _normalize_provider(name: Any) -> str:
     if not isinstance(name, str):
         raise ConfigError(f"Provider names must be strings, got {name!r}")
-    provider = _ALIASES.get(name.lower(), name.lower())
+    provider = BRAIN_ALIASES.get(name.lower(), name.lower())
     if provider not in KNOWN_PROVIDERS:
         raise ConfigError(f"Unknown provider {name!r}")
     return provider

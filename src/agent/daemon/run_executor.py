@@ -6,8 +6,9 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from agent.daemon.audit_log import AuditLog
 from agent.daemon.pubsub import PubSub
@@ -109,17 +110,13 @@ class RunExecutor:
     # Internals
     # ------------------------------------------------------------------
 
-    def _make_emit(
-        self, run_id: str
-    ) -> Callable[[str, dict[str, Any]], Awaitable[None]]:
+    def _make_emit(self, run_id: str) -> Callable[[str, dict[str, Any]], Awaitable[None]]:
         async def _emit(kind: str, payload: dict[str, Any]) -> None:
             seq = self._seq.get(run_id, 0)
             self._seq[run_id] = seq + 1
             event = RunEventRecord(seq=seq, ts=time.time(), kind=kind, payload=payload)
             await self._store.append_event(run_id, event)
-            await self._audit.write(
-                {"run_id": run_id, "seq": seq, "kind": kind, **payload}
-            )
+            await self._audit.write({"run_id": run_id, "seq": seq, "kind": kind, **payload})
             await self._publish(run_id, kind, payload)
 
         return _emit
@@ -139,11 +136,12 @@ class RunExecutor:
         ctx: RunContext,
     ) -> None:
         from agent.awareness.meta_cognition import StuckError
+        from agent.config import DEFAULT_RUN_TIMEOUT
         from agent.learning.outcome import derive_from_status
         from agent.orchestrator import plan as _plan
         from agent.orchestrator import run as _run
 
-        _RUN_TIMEOUT = 300.0  # 5 minutes hard cap
+        _RUN_TIMEOUT = DEFAULT_RUN_TIMEOUT
         orchestrate = _plan if kind == RunKind.plan else _run
         t_start = time.time()
 
@@ -162,7 +160,7 @@ class RunExecutor:
             await self._store.update_run_status(run_id, RunStatus.aborted)
             await self._publish(run_id, f"{kind.value}_aborted", {"reason": "stuck"})
             log.warning("%s %s aborted (stuck)", kind.value.capitalize(), run_id)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             final_status = RunStatus.errored
             msg = f"{kind.value.capitalize()} timed out after {int(_RUN_TIMEOUT)}s"
             await self._store.update_run_status(run_id, RunStatus.errored, error=msg)
@@ -176,9 +174,7 @@ class RunExecutor:
             raise
         except Exception as exc:
             final_status = RunStatus.errored
-            await self._store.update_run_status(
-                run_id, RunStatus.errored, error=str(exc)
-            )
+            await self._store.update_run_status(run_id, RunStatus.errored, error=str(exc))
             await self._publish(run_id, f"{kind.value}_errored", {"error": str(exc)})
             log.error("%s %s errored: %s", kind.value.capitalize(), run_id, exc)
         finally:

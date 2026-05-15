@@ -6,24 +6,14 @@ import os
 from pathlib import Path
 
 from agent.brain.base import Brain
-from agent.config import CONFIG_PATH, AgentConfig, ConfigError, load_config
-
-_ALIASES: dict[str, str] = {
-    "claude": "claude",
-    "openai": "openai",
-    "gpt": "openai",
-    "moonshot": "moonshot",
-    "kimi": "moonshot",
-    "k2": "moonshot",
-    "groq": "groq",
-    "together": "together",
-    "togetherai": "together",
-    "zai": "zai",
-    "glm": "zai",
-    "z.ai": "zai",
-    "qwen": "qwen",
-    "dashscope": "qwen",
-}
+from agent.config import (
+    BRAIN_ALIASES,
+    CONFIG_PATH,
+    KNOWN_PROVIDERS,
+    AgentConfig,
+    ConfigError,
+    load_config,
+)
 
 
 class BrainSelectionError(RuntimeError):
@@ -31,16 +21,8 @@ class BrainSelectionError(RuntimeError):
 
 
 def canonical_provider(name: str) -> str:
-    provider = _ALIASES.get(name.lower(), name.lower())
-    if provider not in {
-        "claude",
-        "openai",
-        "moonshot",
-        "groq",
-        "together",
-        "zai",
-        "qwen",
-    }:
+    provider = BRAIN_ALIASES.get(name.lower(), name.lower())
+    if provider not in KNOWN_PROVIDERS:
         raise BrainSelectionError(f"Unknown brain provider: {name}")
     return provider
 
@@ -98,9 +80,7 @@ def get_brain(override: str | None = None) -> Brain:
     if choice != "auto":
         provider = canonical_provider(choice)
         if not config.brain.is_enabled(provider):
-            raise BrainSelectionError(
-                f"Brain provider '{provider}' is disabled in {config.path}"
-            )
+            raise BrainSelectionError(f"Brain provider '{provider}' is disabled in {config.path}")
         available, reason = _provider_available(provider)
         if not available:
             raise BrainSelectionError(f"Brain provider '{provider}' unavailable: {reason}")
@@ -117,6 +97,5 @@ def get_brain(override: str | None = None) -> Brain:
         checked.append(f"{provider}: {reason}")
 
     raise BrainSelectionError(
-        f"No enabled brain provider is available from {config.path}: "
-        + "; ".join(checked)
+        f"No enabled brain provider is available from {config.path}: " + "; ".join(checked)
     )

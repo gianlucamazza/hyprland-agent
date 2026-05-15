@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+_LATEST_SCHEMA_VERSION = 4  # increment when a new migration is added
+
 _DB_PATH = Path.home() / ".cache" / "hyprland-agent" / "runs.db"
 
 _SCHEMA = """
@@ -247,9 +249,7 @@ class RunStore:
     ) -> None:
         async with self._lock:
             ended = ended_at if ended_at is not None else time.time()
-            await self._run_sync(
-                self._do_update_status, run_id, status.value, ended, error
-            )
+            await self._run_sync(self._do_update_status, run_id, status.value, ended, error)
             self._lru.pop(run_id, None)  # invalidate cache entry
 
     def _do_update_status(
@@ -278,8 +278,7 @@ class RunStore:
         event: RunEventRecord,
     ) -> None:
         conn.execute(
-            "INSERT INTO run_events (run_id, seq, ts, kind, payload_json)"
-            " VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO run_events (run_id, seq, ts, kind, payload_json) VALUES (?, ?, ?, ?, ?)",
             (
                 run_id,
                 event.seq,
@@ -337,9 +336,7 @@ class RunStore:
         rationale: str | None = None,
     ) -> None:
         async with self._lock:
-            await self._run_sync(
-                self._do_upsert_outcome, run_id, outcome, score, source, rationale
-            )
+            await self._run_sync(self._do_upsert_outcome, run_id, outcome, score, source, rationale)
 
     def _do_upsert_outcome(
         self,
@@ -467,8 +464,7 @@ class RunStore:
         if row is None:
             return None
         events = conn.execute(
-            "SELECT seq, ts, kind, payload_json FROM run_events"
-            " WHERE run_id=? ORDER BY seq",
+            "SELECT seq, ts, kind, payload_json FROM run_events WHERE run_id=? ORDER BY seq",
             (run_id,),
         ).fetchall()
         return row, events
@@ -632,9 +628,7 @@ class RunStore:
         generated_by: str,
     ) -> None:
         async with self._lock:
-            await self._run_sync(
-                self._do_insert_reflection, run_id, polarity, text, generated_by
-            )
+            await self._run_sync(self._do_insert_reflection, run_id, polarity, text, generated_by)
 
     def _do_insert_reflection(
         self,
@@ -787,19 +781,13 @@ class RunStore:
         async with self._lock:
             await self._run_sync(self._do_update_skill_status, skill_id, status)
 
-    def _do_update_skill_status(
-        self, conn: sqlite3.Connection, skill_id: str, status: str
-    ) -> None:
+    def _do_update_skill_status(self, conn: sqlite3.Connection, skill_id: str, status: str) -> None:
         conn.execute("UPDATE skills SET status=? WHERE skill_id=?", (status, skill_id))
         conn.commit()
 
-    async def record_skill_outcome(
-        self, skill_id: str, run_id: str, outcome: str
-    ) -> None:
+    async def record_skill_outcome(self, skill_id: str, run_id: str, outcome: str) -> None:
         async with self._lock:
-            await self._run_sync(
-                self._do_record_skill_outcome, skill_id, run_id, outcome
-            )
+            await self._run_sync(self._do_record_skill_outcome, skill_id, run_id, outcome)
 
     def _do_record_skill_outcome(
         self, conn: sqlite3.Connection, skill_id: str, run_id: str, outcome: str
@@ -810,9 +798,7 @@ class RunStore:
         )
         conn.commit()
 
-    async def list_skills(
-        self, status: str | None = None, limit: int = 50
-    ) -> list[dict]:
+    async def list_skills(self, status: str | None = None, limit: int = 50) -> list[dict]:
         return await self._run_sync(self._do_list_skills, status, limit)
 
     def _do_list_skills(
@@ -835,9 +821,7 @@ class RunStore:
     ) -> list[dict]:
         if not self._vec_ok:
             return []
-        return await self._run_vec_sync(
-            self._do_query_skills_by_vec, embedding, k, status
-        )
+        return await self._run_vec_sync(self._do_query_skills_by_vec, embedding, k, status)
 
     def _do_query_skills_by_vec(
         self, conn: sqlite3.Connection, embedding: list[float], k: int, status: str
@@ -887,9 +871,7 @@ class RunStore:
     async def list_learned_rules(self, status: str | None = None) -> list[dict]:
         return await self._run_sync(self._do_list_learned_rules, status)
 
-    def _do_list_learned_rules(
-        self, conn: sqlite3.Connection, status: str | None
-    ) -> list[dict]:
+    def _do_list_learned_rules(self, conn: sqlite3.Connection, status: str | None) -> list[dict]:
         conn.row_factory = sqlite3.Row
         if status:
             rows = conn.execute(
@@ -897,18 +879,14 @@ class RunStore:
                 (status,),
             ).fetchall()
         else:
-            rows = conn.execute(
-                "SELECT * FROM learned_rules ORDER BY proposed_at DESC"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM learned_rules ORDER BY proposed_at DESC").fetchall()
         return [dict(r) for r in rows]
 
     async def update_learned_rule_status(self, rule_id: str, status: str) -> None:
         async with self._lock:
             await self._run_sync(self._do_update_rule_status, rule_id, status)
 
-    def _do_update_rule_status(
-        self, conn: sqlite3.Connection, rule_id: str, status: str
-    ) -> None:
+    def _do_update_rule_status(self, conn: sqlite3.Connection, rule_id: str, status: str) -> None:
         conn.execute(
             "UPDATE learned_rules SET status=?, decided_at=? WHERE rule_id=?",
             (status, time.time(), rule_id),
@@ -921,9 +899,7 @@ class RunStore:
 
     async def upsert_allowlist_proposal(self, app_class: str, title_pat: str) -> None:
         async with self._lock:
-            await self._run_sync(
-                self._do_upsert_allowlist_proposal, app_class, title_pat
-            )
+            await self._run_sync(self._do_upsert_allowlist_proposal, app_class, title_pat)
 
     def _do_upsert_allowlist_proposal(
         self, conn: sqlite3.Connection, app_class: str, title_pat: str
@@ -942,9 +918,7 @@ class RunStore:
     async def list_allowlist_proposals(self, status: str = "pending") -> list[dict]:
         return await self._run_sync(self._do_list_allowlist_proposals, status)
 
-    def _do_list_allowlist_proposals(
-        self, conn: sqlite3.Connection, status: str
-    ) -> list[dict]:
+    def _do_list_allowlist_proposals(self, conn: sqlite3.Connection, status: str) -> list[dict]:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM allowlist_proposals WHERE status=? ORDER BY hit_count DESC",
@@ -952,13 +926,9 @@ class RunStore:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    async def update_allowlist_proposal_status(
-        self, proposal_id: int, status: str
-    ) -> None:
+    async def update_allowlist_proposal_status(self, proposal_id: int, status: str) -> None:
         async with self._lock:
-            await self._run_sync(
-                self._do_update_allowlist_proposal_status, proposal_id, status
-            )
+            await self._run_sync(self._do_update_allowlist_proposal_status, proposal_id, status)
 
     def _do_update_allowlist_proposal_status(
         self, conn: sqlite3.Connection, proposal_id: int, status: str

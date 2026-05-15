@@ -20,8 +20,10 @@ from agent.tools import hypr, screen
 if TYPE_CHECKING:
     from agent.brain.context import BrainContext
 
+from agent.config import DEFAULT_MAX_ITER
+
 _SCALE = 0.5  # screenshot resize factor; coordinates scaled back up before dispatch
-_MAX_LOOP = 20  # max tool-use iterations per decide() call
+_MAX_LOOP = DEFAULT_MAX_ITER
 
 
 @dataclass(frozen=True)
@@ -34,9 +36,7 @@ class ProviderConfig:
 
 
 PROVIDERS: dict[str, ProviderConfig] = {
-    "openai": ProviderConfig(
-        "OpenAI", "OPENAI_API_KEY", "OPENAI_MODEL", "gpt-5.2", None
-    ),
+    "openai": ProviderConfig("OpenAI", "OPENAI_API_KEY", "OPENAI_MODEL", "gpt-5.2", None),
     "moonshot": ProviderConfig(
         "Moonshot",
         "MOONSHOT_API_KEY",
@@ -71,7 +71,7 @@ PROVIDERS: dict[str, ProviderConfig] = {
 }
 
 
-def build_brain(provider_key: str) -> "OpenAICompatibleBrain":
+def build_brain(provider_key: str) -> OpenAICompatibleBrain:
     cfg = PROVIDERS[provider_key]
     api_key = os.environ.get(cfg.key_env, "").strip()
     if not api_key:
@@ -278,9 +278,7 @@ async def _call_tool(
     """
     if name == "screenshot":
         png = await screen.for_vision(scale=_SCALE)
-        return f"data:image/png;base64,{_png_b64(png)}", [
-            Action(kind=ActionKind.screenshot)
-        ]
+        return f"data:image/png;base64,{_png_b64(png)}", [Action(kind=ActionKind.screenshot)]
 
     if name == "left_click":
         x, y = _sc(args["x"], scale), _sc(args["y"], scale)
@@ -333,24 +331,18 @@ async def _call_tool(
 
     if name == "key":
         combo = args["combo"]
-        return f"pressed {combo}", [
-            Action(kind=ActionKind.key, params={"combo": combo})
-        ]
+        return f"pressed {combo}", [Action(kind=ActionKind.key, params={"combo": combo})]
 
     if name == "terminal_command":
         command = args["command"]
         params: dict[str, Any] = {"command": command}
         if "hold_s" in args:
             params["hold_s"] = args["hold_s"]
-        return "terminal command queued", [
-            Action(kind=ActionKind.terminal_command, params=params)
-        ]
+        return "terminal command queued", [Action(kind=ActionKind.terminal_command, params=params)]
 
     if name == "focus_window":
         addr = args["address"]
-        return "focus queued", [
-            Action(kind=ActionKind.focus_window, params={"address": addr})
-        ]
+        return "focus queued", [Action(kind=ActionKind.focus_window, params={"address": addr})]
 
     if name == "list_windows":
         wins = await hypr.clients()
@@ -358,9 +350,7 @@ async def _call_tool(
         return "\n".join(lines) or "(none)", []
 
     if name == "dispatch_hypr":
-        return "dispatch queued", [
-            Action(kind=ActionKind.dispatch, params={"cmd": args["cmd"]})
-        ]
+        return "dispatch queued", [Action(kind=ActionKind.dispatch, params={"cmd": args["cmd"]})]
 
     return "unknown tool", []
 
@@ -374,9 +364,7 @@ class OpenAICompatibleBrain:
             client_kwargs["base_url"] = base_url
         self._client = AsyncOpenAI(**client_kwargs)
 
-    async def decide(
-        self, state: ScreenState, task: str, ctx: "BrainContext"
-    ) -> list[Action]:
+    async def decide(self, state: ScreenState, task: str, ctx: BrainContext) -> list[Action]:
         scaled_w = int(state.width * _SCALE)
         scaled_h = int(state.height * _SCALE)
         png = screen.resize(state.screenshot_png, scale=_SCALE)
@@ -420,9 +408,7 @@ class OpenAICompatibleBrain:
             tool_results = []
             for tc in msg.tool_calls:
                 args = json.loads(tc.function.arguments)
-                result_text, actions = await _call_tool(
-                    tc.function.name, args, scale=self._scale
-                )
+                result_text, actions = await _call_tool(tc.function.name, args, scale=self._scale)
                 all_actions.extend(actions)
                 tool_results.append(
                     {
