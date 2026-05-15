@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agent.awareness.meta_cognition import LoopDetector, PostActionVerifier, StuckError
 from agent.awareness.working import WorkingMemory
 from agent.awareness.world_context import snapshot as _world_snapshot
 from agent.brain.base import Brain
@@ -291,6 +292,9 @@ async def run(
     actions = await brain.decide(state, task, brain_ctx)
     await _emit("actions", {"count": len(actions)})
 
+    loop_detector = LoopDetector()
+    verifier = PostActionVerifier()
+
     for action in actions:
         if killswitch.is_stopped():
             log.warning("Kill switch triggered — stopping")
@@ -299,20 +303,44 @@ async def run(
             return
         log.info("Execute: %s %s", action.kind, action.params)
         await _emit("action", {"kind": action.kind.value, "params": action.params})
+
+        pre_hash: str | None = None
+        if verifier.needs(action.kind):
+            try:
+                pre_hash = verifier.phash(state.screenshot_png)
+            except Exception:
+                pass
+
         result = await _execute_action(action, ctx)
+
+        if pre_hash is not None:
+            try:
+                post_png = await screen.full()
+                post_hash = verifier.phash(post_png)
+                result = verifier.annotate(result, pre_hash, post_hash)
+            except Exception:
+                pass
+
         brain_ctx.working.record(action.kind.value, action.params)
-        # only emit action_result when there is non-trivial data (not just kind)
+
         if (
             result.dispatch_response
             or result.blocked
             or result.rejected
             or result.stdout
             or result.stderr
+            or result.pre_hash
         ):
             result_data = {
                 k: v for k, v in result.model_dump().items() if v is not None
             }
             await _emit("action_result", result_data)
+
+        if loop_detector.observe(action):
+            log.warning("Stuck detected — aborting")
+            await _emit("stuck", {"action": action.model_dump()})
+            raise StuckError(f"Stuck repeating action: {action.kind.value}")
+
         await asyncio.sleep(0.05)
 
     await _emit("done", {})

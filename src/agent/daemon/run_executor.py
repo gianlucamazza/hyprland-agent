@@ -138,6 +138,7 @@ class RunExecutor:
         brain: Any,
         ctx: RunContext,
     ) -> None:
+        from agent.awareness.meta_cognition import StuckError
         from agent.learning.outcome import derive_from_status
         from agent.orchestrator import plan as _plan
         from agent.orchestrator import run as _run
@@ -156,6 +157,11 @@ class RunExecutor:
             await self._store.update_run_status(run_id, RunStatus.completed)
             await self._publish(run_id, f"{kind.value}_completed", {})
             log.info("%s %s completed", kind.value.capitalize(), run_id)
+        except StuckError:
+            final_status = RunStatus.aborted
+            await self._store.update_run_status(run_id, RunStatus.aborted)
+            await self._publish(run_id, f"{kind.value}_aborted", {"reason": "stuck"})
+            log.warning("%s %s aborted (stuck)", kind.value.capitalize(), run_id)
         except asyncio.TimeoutError:
             final_status = RunStatus.errored
             msg = f"{kind.value.capitalize()} timed out after {int(_RUN_TIMEOUT)}s"
@@ -181,3 +187,8 @@ class RunExecutor:
             outcome, score = derive_from_status(final_status)
             await self._store.upsert_run_outcome(run_id, outcome, score, "derived")
             self._seq.pop(run_id, None)
+            await self._publish(
+                run_id,
+                "run_finished",
+                {"task": task, "outcome": outcome, "status": final_status.value},
+            )

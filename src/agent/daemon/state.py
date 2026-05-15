@@ -9,9 +9,10 @@ from agent.daemon.audit_log import AuditLog
 from agent.daemon.pubsub import PubSub
 from agent.daemon.run_executor import RunExecutor
 from agent.daemon.store import RunStore
+from agent.learning.consumer import LearningConsumer
+from agent.learning.reflection import ReflectionEngine
 from agent.memory.embedder import FastEmbedder
 from agent.memory.episodic import EpisodicMemory
-from agent.memory.ingest_consumer import EpisodicIngestor
 from agent.schemas import Rule
 
 
@@ -27,7 +28,8 @@ class AppState:
 
         self.embedder = FastEmbedder(model_name=self.config.memory.embedder_model)
         self.episodic = EpisodicMemory(self.store, self.embedder)
-        self.ingestor: EpisodicIngestor | None = None
+        self.reflection = ReflectionEngine(self.store)
+        self.learning: LearningConsumer | None = None
 
     async def open(self) -> None:
         self.start_time = time.time()
@@ -35,12 +37,14 @@ class AppState:
         await self.audit.open()
         self.executor.app_state = self
         if self.config.memory.enabled:
-            self.ingestor = EpisodicIngestor(self.pubsub, self.episodic)
-            await self.ingestor.start()
+            self.learning = LearningConsumer(
+                self.pubsub, self.episodic, self.reflection
+            )
+            await self.learning.open()
 
     async def close(self) -> None:
-        if self.ingestor is not None:
-            await self.ingestor.stop()
+        if self.learning is not None:
+            await self.learning.close()
         await self.executor.close()
         await self.audit.close()
         await self.store.close()

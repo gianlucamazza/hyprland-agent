@@ -21,28 +21,35 @@ async def inject_context(
     self_model: SelfModel,
     world: WorldSnapshot,
 ) -> BrainContext:
-    """Build a BrainContext enriched with episodic recall.
-
-    Falls back to an empty recall list if episodic memory is unavailable.
-    """
+    """Build a BrainContext enriched with episodic recall and reflections."""
     from agent.awareness.working import WorkingMemory
     from agent.brain.context import BrainContext
 
     recall: list[dict] = []
+    negative_reflections: list[str] = []
 
     episodic: EpisodicMemory | None = getattr(state, "episodic", None)
     if episodic is not None:
         try:
-            k = getattr(state.config, "memory", None)
-            k = k.recall_k if k is not None else 3
+            mem_cfg = getattr(state.config, "memory", None)
+            k = mem_cfg.recall_k if mem_cfg is not None else 3
             episodes = await episodic.recall(task, k=k)
             recall = [ep.to_dict() for ep in episodes]
         except Exception as exc:
             log.warning("Episodic recall failed: %s", exc)
+
+    store = getattr(state, "store", None)
+    if store is not None:
+        try:
+            rows = await store.list_recent_reflections(polarity="negative", limit=20)
+            negative_reflections = [r["text"] for r in rows[:3]]
+        except Exception as exc:
+            log.warning("Reflection fetch failed: %s", exc)
 
     return BrainContext(
         self_model=self_model,
         world=world,
         working=WorkingMemory(),
         recall=recall,
+        negative_reflections=negative_reflections,
     )
