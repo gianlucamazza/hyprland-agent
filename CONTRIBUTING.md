@@ -7,10 +7,20 @@ git clone https://github.com/gianlucamazza/hyprland-agent
 cd hyprland-agent
 uv sync
 uv run pytest -m "not slow"   # fast suite, no embedder download
-uv run pytest                  # full suite (downloads ~600 MB bge-m3 on first run)
+uv run pytest                  # full suite (downloads ~1.3 GB multilingual-e5-large on first run)
 ```
 
 Runtime prerequisites: `wtype`, `ydotool`, `grim`, `wl-clipboard`, `fuzzel` (optional), `mako` (optional).
+
+## Pre-commit hooks
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+The hooks run `ruff` (lint + format), YAML/TOML validation, and large-file checks on every commit.
+To run them manually: `pre-commit run --all-files`.
 
 ## Branch naming
 

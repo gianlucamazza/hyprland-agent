@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      llm-sdks:
+        patterns:
+          - "anthropic"
+          - "openai"
+      memory-stack:
+        patterns:
+          - "fastembed"
+          - "sqlite-vec"
+          - "onnxruntime*"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
