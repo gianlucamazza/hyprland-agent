@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,7 @@ class EpisodicIngestor:
         self._episodic = episodic
         self._task: asyncio.Task | None = None
         self._sem = asyncio.Semaphore(_MAX_CONCURRENT)
+        self._bg_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         ready = asyncio.Event()
@@ -35,10 +37,8 @@ class EpisodicIngestor:
     async def stop(self) -> None:
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def _loop(self, ready: asyncio.Event | None = None) -> None:
@@ -54,9 +54,11 @@ class EpisodicIngestor:
                 run_id = msg.get("run_id")
                 if not run_id:
                     continue
-                asyncio.create_task(self._ingest_safe(run_id))
+                t = asyncio.create_task(self._ingest_safe(run_id))
+                self._bg_tasks.add(t)
+                t.add_done_callback(self._bg_tasks.discard)
         except asyncio.CancelledError:
-            pass
+            raise
         finally:
             await self._pubsub.unsubscribe(Topic.runs, sub)
 

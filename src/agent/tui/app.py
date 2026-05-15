@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import AsyncExitStack
+import logging
+from contextlib import AsyncExitStack, suppress
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ from agent.tui.widgets.run_list import RunList
 from agent.tui.widgets.run_modal import RunModal
 from agent.tui.widgets.status_bar import StatusBar
 
+log = logging.getLogger(__name__)
 
 # ── Broadcast messages (posted by AgentApp, handled by child widgets) ─────────
 
@@ -153,9 +155,7 @@ class AgentApp(App[None]):
 
     async def on_mount(self) -> None:
         try:
-            self._conn = await self._stack.enter_async_context(
-                connect(self._socket_path)
-            )
+            self._conn = await self._stack.enter_async_context(connect(self._socket_path))
         except DaemonUnavailable:
             await self.push_screen(ErrorScreen(self._socket_path))
             return
@@ -166,18 +166,14 @@ class AgentApp(App[None]):
         status_bar = self.query_one(StatusBar)
         status_bar.start()
 
-        try:
+        with suppress(Exception):
             await self.query_one(RunList).refresh_runs(self._conn)
-        except Exception:
-            pass
 
     async def on_unmount(self) -> None:
         if self._dispatcher_task:
             self._dispatcher_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._dispatcher_task
-            except asyncio.CancelledError:
-                pass
         await self._stack.aclose()
 
     async def _event_dispatcher(self) -> None:
@@ -194,11 +190,11 @@ class AgentApp(App[None]):
                     elif topic == Topic.logs:
                         self.query_one(LogPane).post_message(LogMsg(payload))
                 except Exception:
-                    pass
+                    log.debug("widget dispatch error", exc_info=True)
         except asyncio.CancelledError:
             raise
         except Exception:
-            pass
+            log.debug("event stream error", exc_info=True)
 
     # ── Message handlers ───────────────────────────────────────────────────────
 
@@ -248,12 +244,12 @@ class AgentApp(App[None]):
             self.notify("Learning pane not available", severity="warning")
             return
         try:
-            skills = (
-                await self._conn.request(RpcMethod.learning_list, {"kind": "skill"})
-            ).get("items", [])
-            rules = (
-                await self._conn.request(RpcMethod.learning_list, {"kind": "rule"})
-            ).get("items", [])
+            skills = (await self._conn.request(RpcMethod.learning_list, {"kind": "skill"})).get(
+                "items", []
+            )
+            rules = (await self._conn.request(RpcMethod.learning_list, {"kind": "rule"})).get(
+                "items", []
+            )
             allowlist = (
                 await self._conn.request(RpcMethod.learning_list, {"kind": "allowlist"})
             ).get("items", [])
