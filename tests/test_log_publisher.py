@@ -7,8 +7,8 @@ import logging
 
 
 async def test_log_publisher_delivers_record() -> None:
-    from agent.daemon.pubsub import PubSub
     from agent.daemon.log_publisher import install
+    from agent.daemon.pubsub import PubSub
     from agent.ipc.protocol import Topic
 
     pubsub = PubSub()
@@ -39,8 +39,8 @@ async def test_log_publisher_delivers_record() -> None:
 
 async def test_log_publisher_filters_debug() -> None:
     """DEBUG records must NOT reach Topic.logs (handler level is INFO)."""
-    from agent.daemon.pubsub import PubSub
     from agent.daemon.log_publisher import install
+    from agent.daemon.pubsub import PubSub
     from agent.ipc.protocol import Topic
 
     pubsub = PubSub()

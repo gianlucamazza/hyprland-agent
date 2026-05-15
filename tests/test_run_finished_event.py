@@ -77,9 +77,7 @@ async def test_run_finished_published_on_stuck(store: RunStore) -> None:
     from agent.awareness.meta_cognition import StuckError
 
     pubsub = PubSub()
-    received = await _run_with_executor(
-        store, pubsub, orchestrate_side_effect=StuckError("stuck")
-    )
+    received = await _run_with_executor(store, pubsub, orchestrate_side_effect=StuckError("stuck"))
 
     kinds = [m.get("kind") for m in received]
     assert "run_finished" in kinds

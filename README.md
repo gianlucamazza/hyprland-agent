@@ -13,6 +13,8 @@ allowlists, a kill switch, local run history, and daemon-side observability.
 
 ## Quickstart
 
+> **Note**: first `agent run` downloads `intfloat/multilingual-e5-large` (~1.3 GB) for episodic memory. Disable with `memory.enabled: false` if you want to skip it.
+
 ```bash
 # 1. Install system deps (Arch)
 sudo pacman -S ydotool wtype grim wl-clipboard
@@ -101,6 +103,8 @@ src/agent/
 
 ## Prerequisites
 
+> **Disk space**: first run downloads `intfloat/multilingual-e5-large` (~1.3 GB) to `~/.cache/fastembed` for episodic memory. Skip it with `memory.enabled: false` in `~/.config/hyprland-agent/config.yaml`.
+
 ### System packages
 
 ```bash
@@ -118,6 +122,13 @@ systemctl --user enable --now ydotool.service
 ```
 
 After adding yourself to the `input` group, re-login or open a fresh session.
+
+```bash
+# On non-Arch distros, you may also need a udev rule:
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' | \
+    sudo tee /etc/udev/rules.d/80-uinput.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
 
 ### Python environment
 
@@ -174,7 +185,7 @@ Provider selection is controlled by:
 # ~/.config/hyprland-agent/config.yaml
 brain:
   default: auto
-  auto_order: [openai, claude, moonshot, groq, together, zai, qwen]
+  auto_order: [claude, openai, moonshot, groq, together, zai, qwen]
   providers:
     claude:
       enabled: false
@@ -222,7 +233,7 @@ Recommended injection options:
 - **1Password**
 
   ```bash
-  op run --env-file=$HOME/.config/op/secrets.env -- agent daemon
+  op run --env-file=$HOME/.config/op/secrets.env -- agent service start
   ```
 
 - **systemd EnvironmentFile**
@@ -240,7 +251,7 @@ socket.
 
 ```bash
 # 1. Start the daemon in the foreground
-agent daemon
+agent service start
 
 # 2. Create the allowlist. Empty allowlist means deny all.
 agent config init-allowlist
@@ -288,36 +299,36 @@ agent run "run printf hello in an agent-owned terminal and keep it visible for 3
 agent plan "resize the focused window to 800x600"
 
 # List open windows
-agent windows
+agent hypr windows
 
 # Capture current screen
-agent screenshot -o /tmp/screen.png
+agent hypr screenshot -o /tmp/screen.png
 
 # Stream Hyprland events
-agent events
+agent hypr events
 
 # Run history and analytics
-agent list-runs
-agent list-runs --limit 50
-agent get-run <run-id>
-agent runs-analytics --days 7
+agent runs list
+agent runs list --limit 50
+agent runs show <run-id>
+agent runs analytics --days 7
 
 # Explicit feedback (improves episodic memory quality)
-agent feedback <run-id> --up
-agent feedback <run-id> --down --comment "wrong window focused"
+agent runs feedback <run-id> --up
+agent runs feedback <run-id> --down --comment "wrong window focused"
 
 # Daemon status and monitoring
 agent status
 agent tui          # Ctrl+I opens the Learning Inbox
 
 # Watcher rules
-agent rules reload
+agent config reload-rules
 
 # Learning inbox: review and approve what the agent has learned
 agent learning list skill              # draft skill candidates
 agent learning list rule               # proposed watch rules
 agent learning list allowlist          # allowlist entry proposals
-agent learning explain skill <id>      # see what the skill does
+agent learning show skill <id>         # see what the skill does
 agent learning approve skill <id>      # activate a skill
 agent learning approve rule <id>       # write rule to learned_rules.yaml
 agent learning approve allowlist <id>  # write entry to allowlist.yaml
@@ -431,7 +442,7 @@ Supported actions:
 After editing rules:
 
 ```bash
-agent rules reload
+agent config reload-rules
 ```
 
 ## Integrations
@@ -502,7 +513,7 @@ agent learning reject rule <id> --reason "too broad"
 
 In the TUI, press **Ctrl+I** to open the Learning Inbox.
 
-Episodic memory (past runs) is used to inject relevant context into every new task. The first embed call downloads `BAAI/bge-m3` (~600 MB) to `~/.cache/fastembed`; subsequent calls are instant.
+Episodic memory (past runs) is used to inject relevant context into every new task. The first embed call downloads `intfloat/multilingual-e5-large` (~1.3 GB) to `~/.cache/fastembed`; subsequent calls are instant.
 
 ## Run storage
 
@@ -516,8 +527,8 @@ The database uses WAL mode and stores a summary plus event timeline for each
 run.
 
 ```bash
-agent list-runs
-agent get-run <run-id>
+agent runs list
+agent runs show <run-id>
 ```
 
 Opt-in JSONL audit logging is available when `audit_log: true` is set in:
@@ -545,7 +556,7 @@ Opt-in JSONL audit logging is available when `audit_log: true` is set in:
 | ----------------------- | ------------------------------------------------------------------------- |
 | `agent init-allowlist`  | `agent config init-allowlist`                                             |
 | `agent bind-killswitch` | `agent config bind-killswitch`                                            |
-| `agent watch`           | Watcher runs inside the daemon. Use `agent rules reload` to reload rules. |
+| `agent watch`           | Watcher runs inside the daemon. Use `agent config reload-rules` to reload rules. |
 
 | Old                            | New                                                   |
 | ------------------------------ | ----------------------------------------------------- |
@@ -580,11 +591,11 @@ the snapshot intentionally.
 ```bash
 uv run pytest
 uv run agent doctor
-uv run agent daemon -v
+uv run agent service start -v
 ```
 
-The development command `uv run agent daemon -v` is for foreground debugging.
-The installed Lenovo service should run through `~/.local/bin/agent`, which must
+The development command `uv run agent service start -v` is for foreground debugging.
+The installed service should run through `~/.local/bin/agent`, which must
 resolve outside `~/Workspace/ai-agents/hyprland_agent`.
 
 Before changing behavior, compare the README against:

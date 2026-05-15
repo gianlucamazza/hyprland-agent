@@ -14,6 +14,7 @@ Alternative zero-code setup (documented in README):
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING
 
@@ -36,7 +37,7 @@ class IdleIntegration:
 
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
-        self._state: "AppState | None" = None
+        self._state: AppState | None = None
 
     def capabilities(self) -> list[CapabilitySpec]:
         return [
@@ -47,11 +48,11 @@ class IdleIntegration:
             )
         ]
 
-    async def setup(self, state: "AppState") -> None:
+    async def setup(self, state: AppState) -> None:
         try:
             import jeepney  # noqa: F401
-        except ImportError:
-            raise RuntimeError("jeepney not installed — idle integration degraded")
+        except ImportError as exc:
+            raise RuntimeError("jeepney not installed — idle integration degraded") from exc
 
         self._state = state
         self._task = asyncio.create_task(self._listen(), name="idle-dbus-listener")
@@ -60,10 +61,8 @@ class IdleIntegration:
     async def teardown(self) -> None:
         if self._task is not None:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def handle(self, action: Action) -> ActionResult | None:
@@ -78,7 +77,7 @@ class IdleIntegration:
             log.warning("Idle D-Bus listener stopped: %s", exc)
 
     async def _dbus_listen(self) -> None:
-        from jeepney import DBusAddress, MatchRule, MessageType
+        from jeepney import MatchRule, MessageType
         from jeepney.io.asyncio import open_dbus_connection
 
         conn = await open_dbus_connection(bus="SESSION")

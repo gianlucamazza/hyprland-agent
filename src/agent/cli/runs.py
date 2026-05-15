@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -15,12 +15,8 @@ runs_app = typer.Typer(help="Run history and management")
 
 @runs_app.command("list")
 def cmd_list(
-    limit: Annotated[
-        int, typer.Option("--limit", "-n", help="Max number of runs")
-    ] = 20,
-    status: Annotated[
-        Optional[str], typer.Option("--status", "-s", help="Filter by status")
-    ] = None,
+    limit: Annotated[int, typer.Option("--limit", "-n", help="Max number of runs")] = 20,
+    status: Annotated[str | None, typer.Option("--status", "-s", help="Filter by status")] = None,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """List recent agent runs."""
@@ -168,9 +164,7 @@ def cmd_feedback(
     run_id: Annotated[str, typer.Argument(help="Run ID to rate")],
     up: Annotated[bool, typer.Option("--up", help="Thumbs up (success)")] = False,
     down: Annotated[bool, typer.Option("--down", help="Thumbs down (failure)")] = False,
-    comment: Annotated[
-        Optional[str], typer.Option("--comment", "-c", help="Free-text note")
-    ] = None,
+    comment: Annotated[str | None, typer.Option("--comment", "-c", help="Free-text note")] = None,
 ) -> None:
     """Record explicit feedback for a run."""
     if not up and not down and not comment:
@@ -196,9 +190,7 @@ def cmd_feedback(
 
 @runs_app.command("analytics")
 def cmd_analytics(
-    days: Annotated[
-        int, typer.Option("--days", "-d", help="Lookback window in days")
-    ] = 7,
+    days: Annotated[int, typer.Option("--days", "-d", help="Lookback window in days")] = 7,
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Show outcome analytics for recent runs."""

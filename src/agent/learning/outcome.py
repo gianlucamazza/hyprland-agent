@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from agent.schemas import RunStatus
 
 
-class RunOutcome(str, Enum):
+class RunOutcome(StrEnum):
     success = "success"
     partial = "partial"
     failure = "failure"
@@ -15,7 +15,7 @@ class RunOutcome(str, Enum):
     unknown = "unknown"
 
 
-class FeedbackKind(str, Enum):
+class FeedbackKind(StrEnum):
     thumbs_up = "thumbs_up"
     thumbs_down = "thumbs_down"
     comment = "comment"

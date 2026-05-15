@@ -36,6 +36,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `orchestrator.py` — `except Exception: pass` on pre/post hash capture replaced with `log.debug(...)`.
 - `memory/episodic.py` — `except Exception: pass` on analytics fetch replaced with `log.debug(...)`.
 
+### Hardening (pre-publish audit)
+
+**Added**
+- `--version` flag on `agent` CLI (`agent --version` prints `hyprland-agent 1.0.0`).
+- `agent service uninstall` command — removes config, cache, and systemd unit with `--yes` confirmation.
+- `examples/` directory — annotated templates for `allowlist.yaml`, `rules.yaml`, `config.yaml`, `env`.
+- `docs/troubleshooting.md` — FAQ covering daemon startup, ydotool permissions, embedder download, killswitch, and provider key issues.
+- `.pre-commit-config.yaml` — local ruff + ruff-format + pre-commit-hooks gates.
+- `.github/dependabot.yml` — weekly pip updates (grouped LLM SDKs) + monthly Actions updates.
+- `.github/workflows/codeql.yml` — CodeQL static analysis for Python.
+- `pytest-cov` and `pip-audit` added to dev dependencies; coverage gate at 60% and security audit in CI.
+- Smoke tests for CLI entry-point (`tests/cli/test_help.py`).
+- `KNOWN_PROVIDERS`, `BRAIN_ALIASES`, `DEFAULT_MAX_ITER`, `DEFAULT_RUN_TIMEOUT` constants centralised in `config.py` (SSOT).
+- `_LATEST_SCHEMA_VERSION = 4` constant in `daemon/store.py`.
+
+**Changed**
+- `brain/router.py` imports `BRAIN_ALIASES` and `KNOWN_PROVIDERS` from `config.py` instead of duplicating them.
+- `brain/claude.py` and `brain/openai_brain.py` consume `DEFAULT_MAX_ITER` from `config.py`.
+- `daemon/run_executor.py` consumes `DEFAULT_RUN_TIMEOUT` from `config.py`.
+- `tui/widgets/run_modal.py` fallback provider list uses `KNOWN_PROVIDERS` from `config.py`.
+- `scripts/install-local.sh` copies `.env.example` to `~/.config/hyprland-agent/env` on first install.
+- README: embedder download warning added to Prerequisites and Quickstart; ydotool udev rule added.
+- `docs/privacy.md` and `CLAUDE.md` updated to reflect actual embedder model (`intfloat/multilingual-e5-large`, ~1.3 GB).
+- `CONTRIBUTING.md` references updated model size; pre-commit setup instructions added.
+- `pyproject.toml`: classifier updated to `Environment :: Console`; `Topic :: System :: Shells` added; `sdist` exclude list extended.
+- CI workflows: `astral-sh/setup-uv@v3` → `@v5`; coverage + security audit jobs added.
+
+**Fixed**
+- `safety/allowlist.py` default config writes deny-all `allow: []` instead of permissive example entries.
+- `tui/app.py` silent `except Exception: pass` blocks replaced with `log.debug(...)`.
+- `memory/ingest_consumer.py` and `learning/consumer.py` no longer swallow `asyncio.CancelledError` (now re-raised for correct asyncio task lifecycle).
+- `asyncio.create_task` calls tracked in `_bg_tasks` sets with `add_done_callback` in `LearningConsumer`, `EpisodicIngestor`, `StatusBar`, `RunDetail`.
+- `ipc/constants.py` fallback uses `/run/user/{uid}` instead of `/tmp`.
+- Ruff violations: all 177 original errors resolved; `B904` (`raise ... from exc`) applied throughout.
+- `packaging/aur/PKGBUILD` sha256 TODO comment added.
+
 ## [0.3.0] - 2026-05-15
 
 ### Added

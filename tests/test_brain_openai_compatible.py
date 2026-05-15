@@ -9,8 +9,8 @@ import pytest
 from PIL import Image
 
 from agent.brain.openai_brain import (
-    OpenAICompatibleBrain,
     _SCALE,
+    OpenAICompatibleBrain,
     _call_tool,
     build_brain,
 )
@@ -118,9 +118,7 @@ async def test_call_tool_hypr_actions_are_queued_without_dispatch(
     monkeypatch.setattr("agent.brain.openai_brain.hypr.dispatch", dispatch)
 
     _, focus_actions = await _call_tool("focus_window", {"address": "0xabc"}, scale=1.0)
-    _, dispatch_actions = await _call_tool(
-        "dispatch_hypr", {"cmd": "workspace 2"}, scale=1.0
-    )
+    _, dispatch_actions = await _call_tool("dispatch_hypr", {"cmd": "workspace 2"}, scale=1.0)
 
     dispatch.assert_not_awaited()
     assert focus_actions[0].kind == ActionKind.focus_window

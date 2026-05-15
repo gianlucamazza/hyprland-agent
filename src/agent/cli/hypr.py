@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -40,7 +40,7 @@ def cmd_windows(
 @hypr_app.command("events")
 def cmd_events(
     filter_kind: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--filter", "-f", help="Filter events by kind prefix"),
     ] = None,
 ) -> None:

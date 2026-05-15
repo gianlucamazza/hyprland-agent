@@ -13,9 +13,9 @@ Read `README.md` for prerequisites, setup, and user-facing docs. This file cover
 ```bash
 uv sync                      # install deps (Python >= 3.13, managed via uv)
 uv run pytest                # full test suite (338 tests)
-uv run pytest -m "not slow"  # fast suite (skips bge-m3 download)
+uv run pytest -m "not slow"  # fast suite (skips embedder download)
 uv run pytest tests/test_orchestrator.py::test_name   # single test
-uv run agent daemon -v       # run daemon in foreground
+uv run agent service start -v  # run daemon in foreground
 uv run agent doctor          # health check (binaries, sockets, credentials)
 uv run agent plan "<task>"   # plan actions without executing
 uv run agent learning list skill           # list draft skills
@@ -62,7 +62,7 @@ agent run "<task>"
 - `src/agent/schemas.py` — all Pydantic models (Action, ScreenState, RunSummary, ActionResult, …)
 - `src/agent/awareness/` — `WorkingMemory` (per-run action log), `WorldSnapshot` (active windows + focused)
 - `src/agent/introspection/` — `SelfModel` (capabilities, constraints, version)
-- `src/agent/memory/` — `FastEmbedder` (BAAI/bge-m3, lazy singleton, ONNX CPU), `EpisodicMemory` (ingest + recall), `EpisodicIngestor`
+- `src/agent/memory/` — `FastEmbedder` (intfloat/multilingual-e5-large, lazy singleton, ONNX CPU), `EpisodicMemory` (ingest + recall), `EpisodicIngestor`
 - `src/agent/learning/` — `LearningConsumer` (single Topic.runs subscriber), `ReflectionEngine`, `SkillLibrary`, `RuleMiner`, `AllowlistMiner`, `api.py` (proposals CRUD + approval side-effects)
 - `src/agent/awareness/meta_cognition.py` — `LoopDetector` (ring buffer, repeat_threshold=3), `PostActionVerifier` (dHash pre/post screenshot), `StuckError`
 
@@ -79,7 +79,7 @@ Provider keys are read **only by the daemon process** and never cross the IPC so
 - `~/.config/hyprland-agent/` — `allowlist.yaml`, `rules.yaml`, `learned_rules.yaml` (approved rules appended here by `learning approve rule`), `env`, optional `config.yaml`
 - `~/.cache/hyprland-agent/` — `runs.db` (SQLite WAL, schema v4), `STOP` (killswitch flag, polled every 100ms)
 - `$XDG_RUNTIME_DIR/hyprland-agent.sock` — daemon RPC socket, mode 0600
-- `~/.config/systemd/user/hyprland-agent.service` — installed by `agent migrate-systemd`
+- `~/.config/systemd/user/hyprland-agent.service` — installed by `agent service install`
 - `HYPRLAND_INSTANCE_SIGNATURE` env var is **required at runtime** (used to locate Hyprland sockets in `tools/hypr.py`)
 - `.env.example` is the canonical list of provider env vars
 
@@ -87,9 +87,9 @@ Provider keys are read **only by the daemon process** and never cross the IPC so
 
 ```yaml
 memory:
-  enabled: true # episodic memory + recall (BAAI/bge-m3)
+  enabled: true # episodic memory + recall (intfloat/multilingual-e5-large)
   recall_k: 3 # top-k episodes injected into BrainContext
-  embedder_model: "BAAI/bge-m3"
+  embedder_model: "intfloat/multilingual-e5-large"
   filter_failure_in_recall: true
 
 learning:
@@ -112,7 +112,7 @@ Input is **not** routed through Hyprland: keyboard via `wtype`, mouse via `ydoto
 
 The orchestrator enriches every `BrainContext` via `learning/api.inject_context()`:
 
-1. **Episodic recall** (`memory/episodic.py`): top-3 past runs by cosine similarity (bge-m3, sqlite-vec). If the embedder model isn't downloaded yet, recall silently returns `[]`.
+1. **Episodic recall** (`memory/episodic.py`): top-3 past runs by cosine similarity (multilingual-e5-large, sqlite-vec). If the embedder model isn't downloaded yet, recall silently returns `[]`.
 2. **Negative reflections** (`learning/reflection.py`): rule-based lessons from failed/stuck/errored runs, stored in `reflections` table, injected into the prompt.
 3. **Skill suggestions** (`learning/skills.py`): approved skills ranked by task similarity — surfaced in `BrainContext` once a skill is approved via `agent learning approve skill <id>`.
 
@@ -143,7 +143,7 @@ The orchestrator enriches every `BrainContext` via `learning/api.inject_context(
 - **NDJSON frame size cap is 1 MiB** (`ipc/constants.py`). Protocol version 1.0; major-version mismatches are rejected.
 - **Provider enablement is config-driven**. Explicit `--brain openai` or `--brain claude` fails if that provider is disabled in `config.yaml`; `auto` skips disabled or uncredentialed providers.
 - **sqlite-vec loaded per-connection**: `_run_vec_sync` calls `_load_vec0(conn)` on every invocation. `_run_sync` does NOT load vec0. Do not call vec queries through `_run_sync` or they will silently return empty results.
-- **bge-m3 model is ~600 MB** and downloaded lazily on first embed call to `~/.cache/fastembed`. Mark tests that need the real embedder with `@pytest.mark.slow`; stub it with `[[0.1]*1024]` for unit tests.
+- **`intfloat/multilingual-e5-large` model is ~1.3 GB** and downloaded lazily on first embed call to `~/.cache/fastembed`. Mark tests that need the real embedder with `@pytest.mark.slow`; stub it with `[[0.1]*1024]` for unit tests.
 - **`watcher_service.load_rules()`** merges `rules.yaml` and `learned_rules.yaml` with dedup by `(on, match)` key. Duplicate rules across both files are silently dropped.
 
 ## Integrations (P5)

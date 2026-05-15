@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import shlex
 
 from agent.tools._proc import run as _proc_run
 

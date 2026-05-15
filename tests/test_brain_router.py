@@ -17,7 +17,15 @@ def _clear_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _config(
     *,
-    auto_order: tuple[str, ...] = ("claude", "openai", "moonshot", "groq", "together", "zai", "qwen"),
+    auto_order: tuple[str, ...] = (
+        "claude",
+        "openai",
+        "moonshot",
+        "groq",
+        "together",
+        "zai",
+        "qwen",
+    ),
     providers: dict[str, bool] | None = None,
 ) -> AgentConfig:
     enabled = {

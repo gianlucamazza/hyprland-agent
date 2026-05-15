@@ -3,17 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import os
-
-import pytest
 
 from agent.daemon.rule_runner import _ENV_WHITELIST, _RUN_DENY, _safe_env, match_event
 from agent.schemas import Event, EventKind, EventMatch, Rule, RuleAction, RuleActionKind
 
 
-def _rule(
-    on: EventKind, app_class: str | None = None, title: str | None = None
-) -> Rule:
+def _rule(on: EventKind, app_class: str | None = None, title: str | None = None) -> Rule:
     return Rule(
         on=on,
         match=EventMatch(**{"class": app_class, "title": title}),
@@ -132,7 +127,7 @@ async def test_execute_rule_timeout_does_not_propagate() -> None:
     """A rule action that hangs should not propagate an exception — timeout swallows it."""
     from unittest.mock import patch
 
-    from agent.daemon.rule_runner import execute_rule, _ACTION_TIMEOUT
+    from agent.daemon.rule_runner import _ACTION_TIMEOUT, execute_rule
 
     async def _slow_exec(*_a, **_kw) -> None:
         await asyncio.sleep(_ACTION_TIMEOUT + 10)
@@ -144,8 +139,9 @@ async def test_execute_rule_timeout_does_not_propagate() -> None:
     )
     event = _event(EventKind.open_window)
 
-    # Patch _exec_action to simulate a hang
-    with patch("agent.daemon.rule_runner._exec_action", side_effect=_slow_exec):
-        # Should complete without raising, even though action hangs
-        with patch("agent.daemon.rule_runner._ACTION_TIMEOUT", 0.05):
-            await execute_rule(rule, event)
+    # Patch _exec_action to simulate a hang — should complete without raising
+    with (
+        patch("agent.daemon.rule_runner._exec_action", side_effect=_slow_exec),
+        patch("agent.daemon.rule_runner._ACTION_TIMEOUT", 0.05),
+    ):
+        await execute_rule(rule, event)

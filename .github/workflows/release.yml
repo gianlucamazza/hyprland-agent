@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
       - name: Build wheel and sdist
@@ -32,9 +32,9 @@ jobs:
 
             ## Install
 
-            **From source (recommended):**
+            **From wheel (this release):**
             ```bash
-            uv pip install hyprland-agent==${{ steps.version.outputs.VERSION }}
+            pip install https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.VERSION }}/hyprland_agent-${{ steps.version.outputs.VERSION }}-py3-none-any.whl
             ```
 
             **AUR (Arch Linux):**
@@ -42,5 +42,8 @@ jobs:
             yay -S hyprland-agent
             ```
 
-            **Manual (wheel):**
-            Download `hyprland_agent-${{ steps.version.outputs.VERSION }}-py3-none-any.whl` and install with `uv pip install <wheel>`.
+            **From source:**
+            ```bash
+            git clone https://github.com/${{ github.repository }}
+            cd hyprland-agent && uv sync
+            ```

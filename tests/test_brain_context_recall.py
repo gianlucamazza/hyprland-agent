@@ -45,18 +45,13 @@ def test_preamble_contains_recall_task() -> None:
 
 
 def test_preamble_shows_outcome() -> None:
-    ctx = _make_ctx(
-        recall=[{"task": "open firefox", "outcome": "success", "summary": "2 actions"}]
-    )
+    ctx = _make_ctx(recall=[{"task": "open firefox", "outcome": "success", "summary": "2 actions"}])
     preamble = ctx.render_user_preamble()
     assert "success" in preamble
 
 
 def test_recall_capped_at_3_in_preamble() -> None:
-    recall = [
-        {"task": f"task {i}", "outcome": "success", "summary": "done"}
-        for i in range(10)
-    ]
+    recall = [{"task": f"task {i}", "outcome": "success", "summary": "done"} for i in range(10)]
     ctx = _make_ctx(recall=recall)
     preamble = ctx.render_user_preamble()
     assert preamble.count("task ") == 3

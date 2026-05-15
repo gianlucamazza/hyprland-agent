@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Sequence
 
 log = logging.getLogger(__name__)
 
@@ -53,9 +53,7 @@ async def run(
     Raises RuntimeError on timeout; returns non-zero returncode otherwise.
     Does NOT raise on non-zero exit — callers decide what is an error.
     """
-    stdout_pipe = (
-        asyncio.subprocess.PIPE if capture_stdout else asyncio.subprocess.DEVNULL
-    )
+    stdout_pipe = asyncio.subprocess.PIPE if capture_stdout else asyncio.subprocess.DEVNULL
     stdin_pipe = asyncio.subprocess.PIPE if stdin_data is not None else None
 
     proc = await asyncio.create_subprocess_exec(
@@ -67,10 +65,10 @@ async def run(
     )
     try:
         out, err = await asyncio.wait_for(proc.communicate(stdin_data), timeout=timeout)
-    except TimeoutError:
+    except TimeoutError as exc:
         proc.kill()
         await proc.communicate()
-        raise RuntimeError(f"{argv[0]} timed out after {timeout}s")
+        raise RuntimeError(f"{argv[0]} timed out after {timeout}s") from exc
 
     return ProcResult(
         returncode=proc.returncode or 0,

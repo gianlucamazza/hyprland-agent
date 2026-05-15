@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from enum import Enum
+import contextlib
+from enum import StrEnum
 from typing import Any
 
 from agent.ipc.protocol import Topic
 
 
-class DropPolicy(str, Enum):
+class DropPolicy(StrEnum):
     drop_oldest = "drop_oldest"
     disconnect = "disconnect"
 
@@ -43,10 +44,8 @@ class Subscriber:
             try:
                 self.queue.put_nowait(payload)
             except asyncio.QueueFull:
-                try:
+                with contextlib.suppress(asyncio.QueueEmpty):
                     self.queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    pass
                 self.queue.put_nowait(payload)
         else:
             # disconnect policy — mark for removal; caller handles disconnect
@@ -69,10 +68,8 @@ class PubSub:
 
     async def unsubscribe(self, topic: Topic, sub: Subscriber) -> None:
         async with self._lock:
-            try:
+            with contextlib.suppress(ValueError):
                 self._subs[topic].remove(sub)
-            except ValueError:
-                pass
 
     async def publish(self, topic: Topic, payload: dict[str, Any]) -> None:
         async with self._lock:
@@ -85,10 +82,8 @@ class PubSub:
         if dead:
             async with self._lock:
                 for sub in dead:
-                    try:
+                    with contextlib.suppress(ValueError):
                         self._subs[topic].remove(sub)
-                    except ValueError:
-                        pass
 
     async def subscriber_count(self, topic: Topic) -> int:
         async with self._lock:

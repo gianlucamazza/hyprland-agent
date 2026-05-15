@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import time
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from rich.console import Console
@@ -18,7 +18,7 @@ from rich.table import Table
 ENV_FILE_PATH = Path.home() / ".config" / "hyprland-agent" / "env"
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     ok = "OK"
     warn = "WARN"
     fail = "FAIL"
@@ -71,6 +71,29 @@ def _which(cmd: str) -> Check:
     if path:
         return Check(cmd, Status.ok, path)
     return Check(cmd, Status.fail, "not found", f"sudo pacman -S {cmd}")
+
+
+def _which_optional(cmd: str, pkg: str) -> Check:
+    """Optional binary — WARN if missing, not FAIL."""
+    path = shutil.which(cmd)
+    if path:
+        return Check(cmd, Status.ok, path)
+    return Check(cmd, Status.warn, "not found (optional)", f"sudo pacman -S {pkg}")
+
+
+def _embedder_cache() -> Check:
+    cache = Path.home() / ".cache" / "fastembed"
+    if not cache.exists():
+        return Check(
+            "embedder cache",
+            Status.warn,
+            "~/.cache/fastembed not found — will download ~1.3 GB on first embed",
+            "Set memory.enabled: false in config.yaml to skip",
+        )
+    # Calculate total size
+    total = sum(f.stat().st_size for f in cache.rglob("*") if f.is_file())
+    mb = total / (1024 * 1024)
+    return Check("embedder cache", Status.ok, f"~/.cache/fastembed ({mb:.0f} MB)")
 
 
 def _ydotoold_active() -> Check:
@@ -144,9 +167,7 @@ def _oauth_creds() -> Check:
     path = Path.home() / ".claude" / ".credentials.json"
     _, source = _env_value("CLAUDE_CODE_OAUTH_TOKEN")
     if source:
-        return Check(
-            "Claude OAuth", Status.ok, f"CLAUDE_CODE_OAUTH_TOKEN set in {source}"
-        )
+        return Check("Claude OAuth", Status.ok, f"CLAUDE_CODE_OAUTH_TOKEN set in {source}")
     if not path.exists():
         status = Status.fail if "claude" in config.brain.auto_order else Status.warn
         return Check(
@@ -169,9 +190,7 @@ def _oauth_creds() -> Check:
                 Status.warn,
                 "token expires soon or expired — will auto-refresh",
             )
-        return Check(
-            "Claude OAuth", Status.ok, f"valid (expires in {int(remaining_s)}s)"
-        )
+        return Check("Claude OAuth", Status.ok, f"valid (expires in {int(remaining_s)}s)")
     except Exception as exc:
         return Check("Claude OAuth", Status.fail, str(exc))
 
@@ -201,14 +220,12 @@ def _anthropic_model() -> Check:
             Status.warn,
             f"{model} (lower-cost fallback){suffix}",
         )
-    return Check(
-        "ANTHROPIC_MODEL", Status.warn, f"{model} (custom Claude model){suffix}"
-    )
+    return Check("ANTHROPIC_MODEL", Status.warn, f"{model} (custom Claude model){suffix}")
 
 
 def _provider_checks() -> list[Check]:
-    from agent.config import ConfigError, load_config
     from agent.brain.openai_brain import PROVIDERS
+    from agent.config import ConfigError, load_config
 
     try:
         config = load_config()
@@ -234,11 +251,7 @@ def _provider_checks() -> list[Check]:
             model_msg = f"{model} from {model_source}" if model_source else model
             out.append(Check(cfg.model_env, Status.ok, model_msg))
         else:
-            out.append(
-                Check(
-                    cfg.key_env, Status.warn, f"not set — {cfg.name} brain unavailable"
-                )
-            )
+            out.append(Check(cfg.key_env, Status.warn, f"not set — {cfg.name} brain unavailable"))
     return out
 
 
@@ -332,6 +345,11 @@ def run_all() -> list[Check]:
         _allowlist(),
         _killswitch_bind(),
         _daemon_socket(),
+        # Optional integrations
+        _which_optional("notify-send", "libnotify"),
+        _which_optional("fuzzel", "fuzzel"),
+        _which_optional("waybar", "waybar"),
+        _embedder_cache(),
     ]
 
 

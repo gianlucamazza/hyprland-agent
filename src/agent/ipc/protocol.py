@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Annotated, Any, Literal, Union
+from enum import StrEnum
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
 from agent.ipc.constants import PROTOCOL_MAJOR
 
 
-class RpcMethod(str, Enum):
+class RpcMethod(StrEnum):
     plan_task = "plan_task"
     run_task = "run_task"
     cancel_run = "cancel_run"
@@ -32,7 +32,7 @@ class RpcMethod(str, Enum):
     memory_get = "memory_get"
 
 
-class Topic(str, Enum):
+class Topic(StrEnum):
     runs = "runs"
     hypr_events = "hypr_events"
     logs = "logs"
@@ -87,16 +87,14 @@ class PongFrame(_StrictFrame):
 
 
 Frame = Annotated[
-    Union[
-        HelloFrame,
-        RequestFrame,
-        ResponseFrame,
-        SubscribeFrame,
-        UnsubscribeFrame,
-        EventFrame,
-        PingFrame,
-        PongFrame,
-    ],
+    HelloFrame
+    | RequestFrame
+    | ResponseFrame
+    | SubscribeFrame
+    | UnsubscribeFrame
+    | EventFrame
+    | PingFrame
+    | PongFrame,
     Field(discriminator="type"),
 ]
 
@@ -113,9 +111,7 @@ def versions_compatible(a: str, b: str) -> bool:
     return parse_major(a) == parse_major(b) == PROTOCOL_MAJOR
 
 
-def make_error_response(
-    request_id: str, message: str, code: str = "error"
-) -> ResponseFrame:
+def make_error_response(request_id: str, message: str, code: str = "error") -> ResponseFrame:
     return ResponseFrame(id=request_id, error={"code": code, "message": message})
 
 

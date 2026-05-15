@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
-from agent.schemas import Window, Monitor, Workspace
+from agent.schemas import Monitor, Window, Workspace
 
 
 def _socket_path(name: str) -> str:

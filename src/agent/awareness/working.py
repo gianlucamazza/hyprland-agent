@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 _MAX_ENTRIES = 50
@@ -21,12 +21,8 @@ class WorkingMemory:
     def __init__(self) -> None:
         self._entries: list[ActionEntry] = []
 
-    def record(
-        self, kind: str, params: dict[str, Any], result_summary: str | None = None
-    ) -> None:
-        self._entries.append(
-            ActionEntry(kind=kind, params=params, result_summary=result_summary)
-        )
+    def record(self, kind: str, params: dict[str, Any], result_summary: str | None = None) -> None:
+        self._entries.append(ActionEntry(kind=kind, params=params, result_summary=result_summary))
         if len(self._entries) > _MAX_ENTRIES:
             self._entries.pop(0)
 

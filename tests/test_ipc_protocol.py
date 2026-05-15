@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from agent.ipc.constants import PROTOCOL_MAJOR, PROTOCOL_VERSION
+from agent.ipc.constants import PROTOCOL_VERSION
 from agent.ipc.protocol import (
     EventFrame,
     Frame,
@@ -47,9 +47,7 @@ def test_parse_hello_with_capabilities() -> None:
 
 
 def test_parse_request() -> None:
-    f = _parse(
-        {"type": "request", "id": "abc", "method": "daemon_status", "params": {}}
-    )
+    f = _parse({"type": "request", "id": "abc", "method": "daemon_status", "params": {}})
     assert isinstance(f, RequestFrame)
     assert f.method == RpcMethod.daemon_status
     assert f.id == "abc"
@@ -143,9 +141,7 @@ def test_extra_fields_rejected() -> None:
 
 
 def test_roundtrip_request() -> None:
-    original = RequestFrame(
-        id="r1", method=RpcMethod.run_task, params={"task": "open foot"}
-    )
+    original = RequestFrame(id="r1", method=RpcMethod.run_task, params={"task": "open foot"})
     data = original.model_dump_json()
     recovered = _parse(__import__("json").loads(data))
     assert isinstance(recovered, RequestFrame)

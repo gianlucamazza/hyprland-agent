@@ -14,8 +14,8 @@ from __future__ import annotations
 import importlib.metadata
 import logging
 import shutil
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from agent.daemon.state import AppState
@@ -43,11 +43,11 @@ class Integration(Protocol):
 
     def capabilities(self) -> list[CapabilitySpec]: ...
 
-    async def setup(self, state: "AppState") -> None: ...
+    async def setup(self, state: AppState) -> None: ...
 
     async def teardown(self) -> None: ...
 
-    async def handle(self, action: "Action") -> "ActionResult | None":
+    async def handle(self, action: Action) -> ActionResult | None:
         """Handle an action.  Return None to pass through to the next handler."""
         ...
 
@@ -70,9 +70,7 @@ class IntegrationRegistry:
         self._integrations: list[Integration] = []
         self._status: dict[str, str] = {}  # name → ready|degraded|missing
 
-    async def load(
-        self, state: "AppState", enabled: tuple[str, ...] | None = None
-    ) -> None:
+    async def load(self, state: AppState, enabled: tuple[str, ...] | None = None) -> None:
         """Discover and set up integrations.
 
         *enabled* filters which entry-point names to load.  None = load all.
@@ -101,7 +99,7 @@ class IntegrationRegistry:
             else:
                 await self._setup_one(integration, state)
 
-    async def _setup_one(self, integration: Integration, state: "AppState") -> None:
+    async def _setup_one(self, integration: Integration, state: AppState) -> None:
         try:
             await integration.setup(state)
             self._integrations.append(integration)
@@ -119,7 +117,7 @@ class IntegrationRegistry:
                 log.warning("Integration %r teardown error: %s", integ.name, exc)
         self._integrations.clear()
 
-    async def handle(self, action: "Action") -> "ActionResult | None":
+    async def handle(self, action: Action) -> ActionResult | None:
         """Try each integration in registration order; return first non-None result."""
         for integ in self._integrations:
             try:
@@ -127,9 +125,7 @@ class IntegrationRegistry:
                 if result is not None:
                     return result
             except Exception as exc:
-                log.error(
-                    "Integration %r error handling %s: %s", integ.name, action.kind, exc
-                )
+                log.error("Integration %r error handling %s: %s", integ.name, action.kind, exc)
         return None
 
     def status(self) -> dict[str, str]:
@@ -145,8 +141,6 @@ class IntegrationRegistry:
         """Return True if *binary* is on PATH; log and record degraded otherwise."""
         if shutil.which(binary):
             return True
-        log.warning(
-            "Integration %r: binary %r not found — degraded", integration_name, binary
-        )
+        log.warning("Integration %r: binary %r not found — degraded", integration_name, binary)
         self._status[integration_name] = "degraded"
         return False

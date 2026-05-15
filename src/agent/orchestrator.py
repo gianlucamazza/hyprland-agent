@@ -16,7 +16,8 @@ from agent.introspection.self_model import SelfModel
 from agent.safety import confirm, killswitch
 from agent.safety.allowlist import is_allowed
 from agent.schemas import Action, ActionKind, ActionResult, ScreenState
-from agent.tools import hypr, input as inp, screen, terminal
+from agent.tools import hypr, screen, terminal
+from agent.tools import input as inp
 
 if TYPE_CHECKING:
     from agent.daemon.run_executor import RunContext
@@ -75,7 +76,7 @@ async def _focused_control_terminal() -> dict | None:
     return active.model_dump()
 
 
-async def _ensure_keyboard_target_is_safe(ctx: "RunContext | None") -> bool:
+async def _ensure_keyboard_target_is_safe(ctx: RunContext | None) -> bool:
     active = await _focused_control_terminal()
     if active is None:
         return True
@@ -91,8 +92,8 @@ async def _ensure_keyboard_target_is_safe(ctx: "RunContext | None") -> bool:
 
 async def _execute_action(
     action: Action,
-    ctx: "RunContext | None",
-    app_state: "AppState | None" = None,
+    ctx: RunContext | None,
+    app_state: AppState | None = None,
 ) -> ActionResult:
     k = action.kind
     p = action.params
@@ -178,7 +179,7 @@ async def _execute_action(
     return base
 
 
-async def _build_state(task: str, ctx: "RunContext | None") -> tuple[ScreenState, bool]:
+async def _build_state(task: str, ctx: RunContext | None) -> tuple[ScreenState, bool]:
     killswitch.ensure_disarmed()
     log.info("Starting task: %s", task)
 
@@ -237,7 +238,7 @@ async def _assemble_brain_context(
     screen_state: ScreenState,
     brain: Brain,
     task: str,
-    app_state: "AppState | None" = None,
+    app_state: AppState | None = None,
 ) -> BrainContext:
     brain_name = type(brain).__name__
     self_model = SelfModel(brain_name=brain_name)
@@ -258,8 +259,8 @@ async def _assemble_brain_context(
 async def plan(
     task: str,
     brain: Brain,
-    ctx: "RunContext | None" = None,
-    app_state: "AppState | None" = None,
+    ctx: RunContext | None = None,
+    app_state: AppState | None = None,
 ) -> None:
     """Plan a task and record the proposed actions without executing them."""
 
@@ -285,8 +286,8 @@ async def plan(
 async def run(
     task: str,
     brain: Brain,
-    ctx: "RunContext | None" = None,
-    app_state: "AppState | None" = None,
+    ctx: RunContext | None = None,
+    app_state: AppState | None = None,
 ) -> None:
     """Execute a task. If *ctx* is provided, lifecycle events are emitted via it."""
 

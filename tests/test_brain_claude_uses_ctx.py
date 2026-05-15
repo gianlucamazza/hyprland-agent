@@ -71,12 +71,14 @@ async def test_claude_brain_uses_system_prompt_from_ctx() -> None:
 
     brain = ClaudeBrain(model="claude-test")
 
-    with patch("agent.brain.claude.anthropic_client", return_value=fake_client):
-        with patch(
+    with (
+        patch("agent.brain.claude.anthropic_client", return_value=fake_client),
+        patch(
             "agent.brain.claude.asyncio.to_thread",
             side_effect=lambda fn, **kw: fn(**kw),
-        ):
-            actions = await brain.decide(state, "test task", ctx)
+        ),
+    ):
+        actions = await brain.decide(state, "test task", ctx)
 
     assert "system" in captured
     assert expected_system == captured["system"]
@@ -99,12 +101,14 @@ async def test_claude_brain_includes_task_in_user_message() -> None:
 
     brain = ClaudeBrain(model="claude-test")
 
-    with patch("agent.brain.claude.anthropic_client", return_value=fake_client):
-        with patch(
+    with (
+        patch("agent.brain.claude.anthropic_client", return_value=fake_client),
+        patch(
             "agent.brain.claude.asyncio.to_thread",
             side_effect=lambda fn, **kw: fn(**kw),
-        ):
-            await brain.decide(state, "open firefox", ctx)
+        ),
+    ):
+        await brain.decide(state, "open firefox", ctx)
 
     user_msg = captured_messages[0]
     text_blocks = [b for b in user_msg["content"] if b.get("type") == "text"]

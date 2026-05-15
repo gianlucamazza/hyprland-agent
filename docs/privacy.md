@@ -32,7 +32,7 @@ On every action step, the following is transmitted to the configured LLM provide
 | Location | Contents |
 |----------|----------|
 | `~/.cache/hyprland-agent/runs.db` | SQLite WAL: run history, action outcomes, episodic embeddings, learned rules, allowlist proposals. |
-| `~/.cache/fastembed/` | BAAI/bge-m3 model (~600 MB), downloaded on first use. License: MIT. Source: [Hugging Face](https://huggingface.co/BAAI/bge-m3). |
+| `~/.cache/fastembed/` | `intfloat/multilingual-e5-large` model (~1.3 GB), downloaded on first use. License: MIT. Source: [Hugging Face](https://huggingface.co/intfloat/multilingual-e5-large). |
 | `~/.config/hyprland-agent/` | `allowlist.yaml`, `rules.yaml`, `learned_rules.yaml`, `env`, `config.yaml`. |
 
 ## Screenshots

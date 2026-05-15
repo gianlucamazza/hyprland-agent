@@ -1,7 +1,8 @@
 """CLI: agent learning list uses RpcMethod.learning_list."""
 
+from unittest.mock import AsyncMock, patch
+
 from typer.testing import CliRunner
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from agent.cli import app
 

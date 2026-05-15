@@ -25,7 +25,6 @@ from agent.ipc.protocol import (
     Topic,
 )
 
-
 # --- encode_frame / decode_frame ---
 
 
@@ -58,9 +57,7 @@ def test_encode_decode_roundtrip_request() -> None:
 
 
 def test_encode_decode_roundtrip_event() -> None:
-    frame = EventFrame(
-        topic=Topic.runs, payload={"run_id": "abc", "status": "completed"}
-    )
+    frame = EventFrame(topic=Topic.runs, payload={"run_id": "abc", "status": "completed"})
     recovered = decode_frame(encode_frame(frame))
     assert isinstance(recovered, EventFrame)
     assert recovered.payload["run_id"] == "abc"

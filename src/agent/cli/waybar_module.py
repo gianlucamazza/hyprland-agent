@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-import time
 from typing import Any
 
 from agent.client.connection import connect
@@ -27,7 +26,7 @@ from agent.ipc.protocol import Topic
 
 def _render(event_kind: str, payload: dict[str, Any]) -> str:
     status = payload.get("status", "")
-    run_id = str(payload.get("run_id", ""))[:8]
+    str(payload.get("run_id", ""))[:8]
     task = str(payload.get("task", ""))[:60]
     elapsed = payload.get("elapsed_s")
 
@@ -43,25 +42,17 @@ def _render(event_kind: str, payload: dict[str, Any]) -> str:
             return json.dumps({"text": "✓", "class": "done", "tooltip": tooltip})
         if status in ("errored", "aborted"):
             label = "error" if status == "errored" else "aborted"
-            return json.dumps(
-                {"text": "✗", "class": "error", "tooltip": f"{task} · {label}"}
-            )
+            return json.dumps({"text": "✗", "class": "error", "tooltip": f"{task} · {label}"})
 
-    return json.dumps(
-        {"text": "○", "class": "idle", "tooltip": "hyprland-agent · idle"}
-    )
+    return json.dumps({"text": "○", "class": "idle", "tooltip": "hyprland-agent · idle"})
 
 
 def _idle_line() -> str:
-    return json.dumps(
-        {"text": "○", "class": "idle", "tooltip": "hyprland-agent · idle"}
-    )
+    return json.dumps({"text": "○", "class": "idle", "tooltip": "hyprland-agent · idle"})
 
 
 def _disconnected_line() -> str:
-    return json.dumps(
-        {"text": "⊘", "class": "disconnected", "tooltip": "daemon offline"}
-    )
+    return json.dumps({"text": "⊘", "class": "disconnected", "tooltip": "daemon offline"})
 
 
 async def _watch() -> None:

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from importlib.metadata import version as _pkg_version
+from typing import Annotated
+
 import typer
 
 from agent.cli.config import config_app
@@ -20,6 +23,23 @@ from agent.cli.runs import runs_app
 from agent.cli.service import service_app
 
 app = typer.Typer(no_args_is_help=True, help="Hyprland desktop agent")
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"hyprland-agent {_pkg_version('hyprland-agent')}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: Annotated[
+        bool | None,
+        typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version"),
+    ] = None,
+) -> None:
+    pass
+
 
 # Primary actions (top-level)
 app.command("run")(cmd_run)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -27,16 +27,12 @@ from agent.ipc.protocol import (
 class DaemonConnection:
     """Single connection to the daemon. Use via the :func:`connect` context manager."""
 
-    def __init__(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         self._reader = reader
         self._writer = writer
         self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
         # Single queue that the unified _read_loop feeds; events() drains it.
-        self._event_queue: asyncio.Queue[tuple[Topic, dict[str, Any]] | None] = (
-            asyncio.Queue()
-        )
+        self._event_queue: asyncio.Queue[tuple[Topic, dict[str, Any]] | None] = asyncio.Queue()
         self._reader_task: asyncio.Task | None = None
 
     async def _start_reader(self) -> None:
@@ -67,15 +63,11 @@ class DaemonConnection:
         req_id = str(uuid.uuid4())
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         self._pending[req_id] = fut
-        await write_frame(
-            self._writer, RequestFrame(id=req_id, method=method, params=params or {})
-        )
+        await write_frame(self._writer, RequestFrame(id=req_id, method=method, params=params or {}))
         response = await fut
         if response.get("error"):
             err = response["error"]
-            raise RpcError(
-                err.get("code", "error"), err.get("message", "unknown error")
-            )
+            raise RpcError(err.get("code", "error"), err.get("message", "unknown error"))
         return response.get("result") or {}
 
     async def subscribe(self, *topics: Topic) -> None:
@@ -92,15 +84,11 @@ class DaemonConnection:
     async def close(self) -> None:
         if self._reader_task:
             self._reader_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._reader_task
-            except asyncio.CancelledError:
-                pass
         self._writer.close()
-        try:
+        with suppress(Exception):
             await self._writer.wait_closed()
-        except Exception:
-            pass
 
 
 @asynccontextmanager

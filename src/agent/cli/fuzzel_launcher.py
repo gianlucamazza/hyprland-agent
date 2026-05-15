@@ -65,9 +65,7 @@ async def _pick_task(brain: str) -> int:
 
     try:
         async with connect(SOCKET_PATH) as conn:
-            result = await conn.request(
-                RpcMethod.run_task, {"task": chosen, "brain": brain}
-            )
+            result = await conn.request(RpcMethod.run_task, {"task": chosen, "brain": brain})
         print(f"run_id: {result.get('run_id', '?')}")
         return 0
     except (DaemonUnavailable, RpcError) as exc:

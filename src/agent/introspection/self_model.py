@@ -17,9 +17,7 @@ _ALWAYS_DENY = {"1password", "_1password", "keepassxc", "gnome-keyring"}
 class SelfModel:
     """Static introspection: capabilities, limits, safety constraints, active brain."""
 
-    def __init__(
-        self, brain_name: str = "unknown", start_time: float | None = None
-    ) -> None:
+    def __init__(self, brain_name: str = "unknown", start_time: float | None = None) -> None:
         self._brain = brain_name
         self._start_time = start_time or time.time()
 

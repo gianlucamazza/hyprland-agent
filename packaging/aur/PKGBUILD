@@ -23,6 +23,8 @@ makedepends=('python-installer' 'python-build' 'uv')
 provides=('hyprland-agent')
 conflicts=('hyprland-agent')
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gianlucamazza/hyprland-agent/archive/refs/tags/v${pkgver}.tar.gz")
+# TODO(release): replace SKIP with real sha256 after tag is pushed to GitHub.
+# Run: curl -L <tarball-url> | sha256sum
 sha256sums=('SKIP')
 
 build() {

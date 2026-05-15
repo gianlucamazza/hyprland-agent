@@ -5,11 +5,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from agent.daemon.store import RunStore
-from agent.schemas import Window
 from agent.safety.allowlist import is_allowed
+from agent.schemas import Window
 
 
 def _window(cls: str) -> Window:
@@ -30,7 +28,6 @@ def _window(cls: str) -> Window:
 def test_pending_proposal_does_not_allow(tmp_path):
     """Upserting an allowlist proposal keeps is_allowed() returning False."""
     store = RunStore(tmp_path / "runs.db")
-    import asyncio
 
     asyncio.run(store.open())
 

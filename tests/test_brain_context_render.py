@@ -8,9 +8,7 @@ from agent.brain.context import BrainContext
 from agent.introspection.self_model import SelfModel
 
 
-def _make_ctx(
-    brain_name: str = "TestBrain", recall: list | None = None
-) -> BrainContext:
+def _make_ctx(brain_name: str = "TestBrain", recall: list | None = None) -> BrainContext:
     sm = SelfModel(brain_name=brain_name)
     world = WorldSnapshot(
         active_window_class="foot",
@@ -82,10 +80,7 @@ def test_render_user_preamble_with_negative_reflections() -> None:
 
 
 def test_recall_capped_at_3() -> None:
-    episodes = [
-        {"task": f"task {i}", "outcome": "success", "summary": "done"}
-        for i in range(10)
-    ]
+    episodes = [{"task": f"task {i}", "outcome": "success", "summary": "done"} for i in range(10)]
     ctx = _make_ctx(recall=episodes)
     preamble = ctx.render_user_preamble()
     assert preamble.count("task ") == 3

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 SOCKET_PATH: Path = (
-    Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "hyprland-agent.sock"
+    Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "hyprland-agent.sock"
 )
 
 PROTOCOL_VERSION = "1.0"

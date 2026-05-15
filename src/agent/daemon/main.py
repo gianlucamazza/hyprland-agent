@@ -75,7 +75,7 @@ async def run(socket_path: Path = SOCKET_PATH) -> None:
 
     try:
         await asyncio.wait_for(state.executor.close(), timeout=5.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         log.warning("Some runs did not finish within grace period")
 
     for task in (server_task, watcher_task, poller_task):

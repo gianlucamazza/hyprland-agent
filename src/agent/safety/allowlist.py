@@ -69,9 +69,9 @@ def is_allowed(window: Window) -> bool:
     for rule in rules:
         class_pat = rule.get("class", "*")
         title_pat = rule.get("title", "*")
-        if fnmatch.fnmatch(
-            window.app_class.lower(), class_pat.lower()
-        ) and fnmatch.fnmatch(window.title.lower(), title_pat.lower()):
+        if fnmatch.fnmatch(window.app_class.lower(), class_pat.lower()) and fnmatch.fnmatch(
+            window.title.lower(), title_pat.lower()
+        ):
             return True
 
     # Miss: record for allowlist mining (skip _ALWAYS_DENY — those are intentional)
@@ -100,12 +100,8 @@ def create_default_config() -> None:
     _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     if _CONFIG_PATH.exists():
         return
-    example = {
-        "allow": [
-            {"class": "foot", "title": "*"},
-            {"class": "firefox", "title": "*"},
-            {"class": "chromium", "title": "*"},
-        ]
-    }
+    # Deny-all default — edit this file to allow specific windows.
+    # Example entry: {class: foot, title: "*"}
+    example = {"allow": []}
     with open(_CONFIG_PATH, "w") as f:
         yaml.dump(example, f, default_flow_style=False)

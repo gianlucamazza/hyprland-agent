@@ -42,9 +42,7 @@ class AppState:
         enabled = cfg.enabled if cfg.enabled else None
         await self.integrations.load(self, enabled=enabled)
         if self.config.memory.enabled:
-            self.learning = LearningConsumer(
-                self.pubsub, self.episodic, self.reflection
-            )
+            self.learning = LearningConsumer(self.pubsub, self.episodic, self.reflection)
             await self.learning.open()
 
     async def close(self) -> None:

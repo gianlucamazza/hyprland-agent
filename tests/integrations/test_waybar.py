@@ -54,9 +54,7 @@ def test_waybar_module_render_running():
 def test_waybar_module_render_done():
     from agent.cli.waybar_module import _render
 
-    line = _render(
-        "run_finished", {"status": "completed", "task": "do thing", "elapsed_s": 5.0}
-    )
+    line = _render("run_finished", {"status": "completed", "task": "do thing", "elapsed_s": 5.0})
     data = json.loads(line)
     assert data["class"] == "done"
     assert "✓" in data["text"]

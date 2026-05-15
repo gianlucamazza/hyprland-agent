@@ -13,7 +13,7 @@ from agent.safety import allowlist as _allowlist_mod
 @pytest.fixture
 def store(tmp_path):
     s = RunStore(tmp_path / "runs.db")
-    import asyncio; asyncio.run(s.open())
+    asyncio.run(s.open())
     return s
 
 

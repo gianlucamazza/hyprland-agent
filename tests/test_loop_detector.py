@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
-
 from agent.awareness.meta_cognition import LoopDetector
-from agent.schemas import ActionKind
 
 
 def _action(kind: str = "click", params: dict | None = None):

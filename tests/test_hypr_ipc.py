@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import json
-
-import pytest
-
-from agent.tools.events import _parse
 from agent.schemas import EventKind
+from agent.tools.events import _parse
 
 
 def test_parse_activewindow() -> None:

@@ -35,9 +35,7 @@ class LoopDetector:
 
     def observe(self, action: Action) -> bool:
         """Record *action* and return True if stuck threshold is reached."""
-        key = json.dumps(
-            {"kind": action.kind.value, "params": action.params}, sort_keys=True
-        )
+        key = json.dumps({"kind": action.kind.value, "params": action.params}, sort_keys=True)
         self._history.append(key)
         count = sum(1 for k in self._history if k == key)
         return count >= self._threshold
@@ -53,9 +51,7 @@ class PostActionVerifier:
         """Return an 8-byte dHash hex string for *png_bytes*."""
         from PIL import Image
 
-        img = (
-            Image.open(io.BytesIO(png_bytes)).convert("L").resize((9, 8), Image.LANCZOS)
-        )
+        img = Image.open(io.BytesIO(png_bytes)).convert("L").resize((9, 8), Image.LANCZOS)
         pixels = img.tobytes()  # grayscale: each byte is one pixel intensity
         bits = []
         for row in range(8):
@@ -69,9 +65,7 @@ class PostActionVerifier:
         """Return True if *kind* typically produces a visible screen change."""
         return kind.value in _VISUAL_KINDS
 
-    def annotate(
-        self, result: ActionResult, pre_hash: str, post_hash: str
-    ) -> ActionResult:
+    def annotate(self, result: ActionResult, pre_hash: str, post_hash: str) -> ActionResult:
         """Set pre_hash / post_hash on *result* and warn if screen unchanged."""
         result.pre_hash = pre_hash
         result.post_hash = post_hash

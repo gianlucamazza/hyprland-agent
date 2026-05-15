@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import sys
 
-
 _DESTRUCTIVE_DISPATCH = {
     "killactive",
     "closewindow",

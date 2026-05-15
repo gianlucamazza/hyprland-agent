@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -60,9 +60,7 @@ async def test_error_category_sets_critical_urgency(mako, mako_state, monkeypatc
     monkeypatch.setattr("shutil.which", lambda b: f"/usr/bin/{b}")
     await mako.setup(mako_state)
 
-    action = Action(
-        kind=ActionKind.notify, params={"category": "error", "message": "oops"}
-    )
+    action = Action(kind=ActionKind.notify, params={"category": "error", "message": "oops"})
     await mako.handle(action)
     assert "critical" in captured[0]
 

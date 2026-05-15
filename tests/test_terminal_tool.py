@@ -61,9 +61,7 @@ async def test_run_command_launches_owned_foot_and_emits_lifecycle(
         create_subprocess_exec,
     )
 
-    code, stdout, stderr = await terminal.run_command(
-        "printf %s hello", run_id="run-1", emit=emit
-    )
+    code, stdout, stderr = await terminal.run_command("printf %s hello", run_id="run-1", emit=emit)
 
     assert code == 0
     assert stdout == ""

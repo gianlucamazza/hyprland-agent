@@ -17,9 +17,7 @@ def store(tmp_path):
 def test_v4_tables_present(store):
     async def _run():
         def _q(conn):
-            rows = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             return {r[0] for r in rows}
 
         return await store._run_sync(_q)

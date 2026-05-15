@@ -1,16 +1,14 @@
 """learning.api.approve rule: appends YAML to learned_rules.yaml."""
 
 import asyncio
-import time
-from pathlib import Path
 from unittest.mock import patch
 
-import yaml
 import pytest
+import yaml
 
 from agent.daemon.store import RunStore
-from agent.learning.api import approve, _append_learned_rule
 from agent.learning import api as _api_mod
+from agent.learning.api import _append_learned_rule, approve
 
 
 @pytest.fixture
@@ -57,9 +55,7 @@ def test_approve_rule_writes_yaml(store, tmp_path):
 
 def test_append_learned_rule_idempotent_across_calls(tmp_path):
     learned_path = tmp_path / "lr.yaml"
-    rule_yaml = yaml.dump(
-        {"rules": [{"on": "openwindow", "match": {"class": "x"}, "actions": []}]}
-    )
+    rule_yaml = yaml.dump({"rules": [{"on": "openwindow", "match": {"class": "x"}, "actions": []}]})
 
     with patch.object(_api_mod, "_LEARNED_RULES_PATH", learned_path):
         _append_learned_rule(rule_yaml)

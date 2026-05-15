@@ -34,7 +34,7 @@ class WaybarIntegration:
             )
         ]
 
-    async def setup(self, state: "AppState") -> None:
+    async def setup(self, state: AppState) -> None:
         # No binary or process needed server-side; agent-waybar opens its own
         # RPC connection and subscribes to Topic.runs directly.
         log.debug("Waybar integration ready (client-driven)")

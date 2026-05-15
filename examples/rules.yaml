@@ -1,0 +1,30 @@
+# rules.yaml — event-driven automation rules.
+#
+# Rules fire when Hyprland emits matching window events.
+# Supported actions: dispatch, log, notify, run
+#
+# Format:
+#   - on: <event>          # activewindow | openwindow | closewindow | workspace
+#     match: "<glob>"      # matched against window class or workspace name
+#     actions:
+#       - <action>: <value>
+#
+# Examples:
+
+# Focus Firefox → log it
+- on: activewindow
+  match: "firefox"
+  actions:
+    - log: "Firefox focused"
+
+# Any terminal opens → notify
+- on: openwindow
+  match: "foot"
+  actions:
+    - notify: "Terminal opened"
+
+# Switch to workspace 2 → dispatch a Hyprland command
+- on: workspace
+  match: "2"
+  actions:
+    - dispatch: "exec waybar"

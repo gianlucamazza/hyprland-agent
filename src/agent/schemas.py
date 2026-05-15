@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -58,7 +58,7 @@ class Workspace(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class EventKind(str, Enum):
+class EventKind(StrEnum):
     workspace = "workspace"
     active_window = "activewindow"
     open_window = "openwindow"
@@ -75,7 +75,7 @@ class Event(BaseModel):
     raw: str
 
 
-class ActionKind(str, Enum):
+class ActionKind(StrEnum):
     screenshot = "screenshot"
     terminal_command = "terminal_command"
     type_text = "type_text"
@@ -115,7 +115,7 @@ class EventMatch(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class RuleActionKind(str, Enum):
+class RuleActionKind(StrEnum):
     dispatch = "dispatch"
     log = "log"
     notify = "notify"
@@ -133,14 +133,12 @@ class Rule(BaseModel):
     actions: list[RuleAction]
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Rule":
+    def from_dict(cls, data: dict[str, Any]) -> Rule:
         """Parse a rule dict from YAML into a Rule model."""
         raw_actions: list[RuleAction] = []
         for item in data.get("actions", []):
             for kind_str, value in item.items():
-                raw_actions.append(
-                    RuleAction(kind=RuleActionKind(kind_str), value=str(value))
-                )
+                raw_actions.append(RuleAction(kind=RuleActionKind(kind_str), value=str(value)))
         match_data = data.get("match", {})
         return cls(
             on=EventKind(data["on"]),
@@ -152,14 +150,14 @@ class Rule(BaseModel):
 # --- Run-history schemas ---
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     running = "running"
     completed = "completed"
     errored = "errored"
     aborted = "aborted"
 
 
-class RunKind(str, Enum):
+class RunKind(StrEnum):
     run = "run"
     plan = "plan"
 

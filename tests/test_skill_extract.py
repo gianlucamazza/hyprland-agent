@@ -8,7 +8,7 @@ import pytest
 
 from agent.daemon.store import RunStore
 from agent.learning.skills import SkillLibrary
-from agent.schemas import RunEventRecord, RunKind, RunStatus, RunSummary
+from agent.schemas import RunEventRecord, RunStatus, RunSummary
 
 
 class _StubEmbedder:
@@ -66,12 +66,8 @@ def test_extract_deterministic(store, library):
     """Same task + same actions → same skill_id."""
 
     async def _run():
-        run_id1 = await _insert_run_with_actions(
-            store, "resize window", ["dispatch_hypr"]
-        )
-        run_id2 = await _insert_run_with_actions(
-            store, "resize window", ["dispatch_hypr"]
-        )
+        run_id1 = await _insert_run_with_actions(store, "resize window", ["dispatch_hypr"])
+        run_id2 = await _insert_run_with_actions(store, "resize window", ["dispatch_hypr"])
         id1 = await library.extract_candidate(run_id1)
         id2 = await library.extract_candidate(run_id2)
         assert id1 == id2

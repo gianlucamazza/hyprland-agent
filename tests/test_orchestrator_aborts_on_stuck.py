@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -69,13 +68,11 @@ async def test_orchestrator_raises_stuck_error() -> None:
                 model_dump=lambda: {},
             ),
         ),
-        patch(
-            "agent.tools.screen.full", new_callable=AsyncMock, return_value=_make_png()
-        ),
+        patch("agent.tools.screen.full", new_callable=AsyncMock, return_value=_make_png()),
         patch("agent.safety.killswitch.is_stopped", return_value=False),
+        pytest.raises(StuckError),
     ):
-        with pytest.raises(StuckError):
-            await _run("click repeatedly", brain)
+        await _run("click repeatedly", brain)
 
 
 async def test_orchestrator_no_stuck_with_varied_actions() -> None:
@@ -111,9 +108,7 @@ async def test_orchestrator_no_stuck_with_varied_actions() -> None:
                 model_dump=lambda: {},
             ),
         ),
-        patch(
-            "agent.tools.screen.full", new_callable=AsyncMock, return_value=_make_png()
-        ),
+        patch("agent.tools.screen.full", new_callable=AsyncMock, return_value=_make_png()),
         patch("agent.safety.killswitch.is_stopped", return_value=False),
     ):
         # Should complete without raising StuckError

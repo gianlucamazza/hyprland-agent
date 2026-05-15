@@ -1,9 +1,7 @@
 """SAFETY: approved skills cannot bypass the allowlist / _ALWAYS_DENY."""
 
-import pytest
-
-from agent.schemas import Window
 from agent.safety.allowlist import _ALWAYS_DENY, is_allowed
+from agent.schemas import Window
 
 
 def _window(cls: str, title: str = "test") -> Window:
@@ -50,7 +48,6 @@ def test_skill_approval_does_not_modify_is_allowed(tmp_path):
     from agent.learning.api import approve
 
     store = RunStore(tmp_path / "runs.db")
-    import asyncio
 
     asyncio.run(store.open())
 

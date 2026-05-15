@@ -19,9 +19,18 @@ class StatusBar(Static):
     }
     """
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._bg_tasks: set[asyncio.Task] = set()
+
+    def _spawn(self) -> None:
+        t = asyncio.create_task(self._refresh())
+        self._bg_tasks.add(t)
+        t.add_done_callback(self._bg_tasks.discard)
+
     def start(self) -> None:
-        asyncio.create_task(self._refresh())
-        self.set_interval(5.0, lambda: asyncio.create_task(self._refresh()))
+        self._spawn()
+        self.set_interval(5.0, self._spawn)
 
     async def _refresh(self) -> None:
         conn = self.app._conn  # type: ignore[attr-defined]

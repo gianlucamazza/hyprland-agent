@@ -8,9 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from agent.integrations import (
-    INTEGRATIONS_API_VERSION,
     CapabilitySpec,
-    Integration,
     IntegrationRegistry,
 )
 from agent.schemas import Action, ActionKind, ActionResult

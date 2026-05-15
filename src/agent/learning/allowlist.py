@@ -25,7 +25,7 @@ class AllowlistMiner:
         if not misses:
             return 0
         count = 0
-        for (app_class, title), _hits in misses.items():
+        for (app_class, _title), _hits in misses.items():
             try:
                 await self._store.upsert_allowlist_proposal(app_class, "*")
                 count += 1

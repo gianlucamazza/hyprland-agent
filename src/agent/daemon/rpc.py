@@ -8,8 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from agent.daemon.state import AppState
-from agent.ipc.protocol import RpcMethod, make_error_response, make_ok_response
-from agent.ipc.protocol import ResponseFrame
+from agent.ipc.protocol import ResponseFrame, RpcMethod, make_error_response, make_ok_response
 
 log = logging.getLogger(__name__)
 
@@ -111,9 +110,7 @@ async def _record_feedback(state: AppState, params: dict[str, Any]) -> dict[str,
 
     outcome, score = feedback_to_outcome(kind)
     if outcome != "unknown":
-        await state.store.upsert_run_outcome(
-            run_id, outcome, score, "explicit", rationale=comment
-        )
+        await state.store.upsert_run_outcome(run_id, outcome, score, "explicit", rationale=comment)
     return {"feedback_id": feedback_id, "outcome": outcome}
 
 
@@ -237,9 +234,7 @@ async def dispatch(
 ) -> ResponseFrame:
     handler = _DISPATCH.get(method)
     if handler is None:
-        return make_error_response(
-            request_id, f"unknown method: {method}", code="not_implemented"
-        )
+        return make_error_response(request_id, f"unknown method: {method}", code="not_implemented")
     try:
         result = await handler(state, params)
         return make_ok_response(request_id, result)

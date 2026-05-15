@@ -77,9 +77,7 @@ def match_event(rule: Rule, event: Event) -> bool:
 
     if m.app_class and not fnmatch.fnmatch(ev_class.lower(), m.app_class.lower()):
         return False
-    if m.title and not fnmatch.fnmatch(ev_title.lower(), m.title.lower()):
-        return False
-    return True
+    return not (m.title and not fnmatch.fnmatch(ev_title.lower(), m.title.lower()))
 
 
 async def execute_rule(rule: Rule, event: Event) -> None:
@@ -87,7 +85,7 @@ async def execute_rule(rule: Rule, event: Event) -> None:
     for action in rule.actions:
         try:
             await asyncio.wait_for(_exec_action(action, event), timeout=_ACTION_TIMEOUT)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log.warning(
                 "Rule action timed out after %.0fs: %s %s",
                 _ACTION_TIMEOUT,
@@ -146,6 +144,4 @@ async def _exec_action(action, event: Event) -> None:
         )
         _, err = await proc.communicate()
         if proc.returncode != 0:
-            log.warning(
-                "[rule] run exited %d: %s", proc.returncode, err.decode().strip()
-            )
+            log.warning("[rule] run exited %d: %s", proc.returncode, err.decode().strip())

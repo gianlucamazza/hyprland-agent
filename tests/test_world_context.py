@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from agent.awareness.world_context import WorldSnapshot, snapshot

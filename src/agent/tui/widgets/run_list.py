@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Any
 
 from textual.message import Message
@@ -89,10 +90,8 @@ class RunList(DataTable):
             new_status = _map[kind]
             style = _STATUS_STYLE.get(new_status, "")
             cell_val = f"[{style}]{new_status}[/{style}]" if style else new_status
-            try:
+            with contextlib.suppress(Exception):
                 self.update_cell(run_id, "status", cell_val)
-            except Exception:
-                pass
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.row_key and event.row_key.value:

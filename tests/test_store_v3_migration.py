@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 from pathlib import Path
 
@@ -18,9 +17,7 @@ async def fresh_store(tmp_path: Path) -> RunStore:
     return s
 
 
-async def test_v3_migration_bumps_user_version(
-    fresh_store: RunStore, tmp_path: Path
-) -> None:
+async def test_v3_migration_bumps_user_version(fresh_store: RunStore, tmp_path: Path) -> None:
     with sqlite3.connect(str(tmp_path / "runs.db")) as conn:
         ver = conn.execute("PRAGMA user_version").fetchone()[0]
     assert ver >= 3  # v4 is applied after v3 in the same open() call
@@ -30,20 +27,17 @@ async def test_episodes_table_exists(fresh_store: RunStore, tmp_path: Path) -> N
     with sqlite3.connect(str(tmp_path / "runs.db")) as conn:
         tables = {
             r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         }
     assert "episodes" in tables
     assert "reflections" in tables
 
 
-async def test_insert_and_retrieve_episode(
-    fresh_store: RunStore, tmp_path: Path
-) -> None:
+async def test_insert_and_retrieve_episode(fresh_store: RunStore, tmp_path: Path) -> None:
     # Need a runs row first (FK constraint)
-    from agent.schemas import RunKind, RunStatus, RunSummary
     import time
+
+    from agent.schemas import RunKind, RunStatus, RunSummary
 
     summary = RunSummary(
         run_id="r1",
@@ -72,8 +66,9 @@ async def test_insert_and_retrieve_episode(
 
 
 async def test_insert_reflection(fresh_store: RunStore, tmp_path: Path) -> None:
-    from agent.schemas import RunKind, RunStatus, RunSummary
     import time
+
+    from agent.schemas import RunKind, RunStatus, RunSummary
 
     summary = RunSummary(
         run_id="r2",
@@ -84,9 +79,7 @@ async def test_insert_reflection(fresh_store: RunStore, tmp_path: Path) -> None:
         started_at=time.time(),
     )
     await fresh_store.insert_run(summary)
-    await fresh_store.insert_reflection(
-        "r2", "negative", "Do not click randomly.", "TestBrain"
-    )
+    await fresh_store.insert_reflection("r2", "negative", "Do not click randomly.", "TestBrain")
 
     rows = await fresh_store.list_recent_reflections(polarity="negative", limit=5)
     assert len(rows) == 1
@@ -98,15 +91,12 @@ async def test_vec_ok_flag(fresh_store: RunStore) -> None:
     assert fresh_store._vec_ok is True
 
 
-async def test_episode_vec_insert_and_query(
-    fresh_store: RunStore, tmp_path: Path
-) -> None:
-    from agent.schemas import RunKind, RunStatus, RunSummary
+async def test_episode_vec_insert_and_query(fresh_store: RunStore, tmp_path: Path) -> None:
     import time
 
-    for i, task in enumerate(
-        ["open firefox", "launch ghostty", "open firefox browser"]
-    ):
+    from agent.schemas import RunKind, RunStatus, RunSummary
+
+    for i, task in enumerate(["open firefox", "launch ghostty", "open firefox browser"]):
         summary = RunSummary(
             run_id=f"rv{i}",
             kind=RunKind.run,
@@ -120,7 +110,7 @@ async def test_episode_vec_insert_and_query(
             run_id=f"rv{i}",
             task=task,
             outcome="success",
-            summary=f"1 actions: dispatch_hypr",
+            summary="1 actions: dispatch_hypr",
             context_class=None,
             actions_json="[]",
         )

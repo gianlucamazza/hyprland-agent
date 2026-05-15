@@ -1,0 +1,20 @@
+# allowlist.yaml — controls which windows the agent can interact with.
+#
+# By default the agent denies ALL window interactions.
+# Add entries here to allow specific windows.
+#
+# Format:
+#   - class: <wm_class>    # mandatory
+#     title: "<glob>"      # optional, * matches any title
+#
+# Password managers (1password, keepassxc, gnome-keyring) are always denied,
+# even if listed here.
+#
+# Examples:
+#   - class: foot           # allow all foot terminal windows
+#     title: "*"
+#   - class: firefox        # allow only Firefox windows titled "Dashboard"
+#     title: "Dashboard"
+#   - class: kitty
+
+allow: []

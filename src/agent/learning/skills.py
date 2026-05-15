@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -70,9 +69,7 @@ class SkillLibrary:
         """Return up to *k* approved skills ranked by similarity to *task*."""
         try:
             embs = await self._embedder.embed([task])
-            return await self._store.query_skills_by_vec(
-                embs[0], k=k, status="approved"
-            )
+            return await self._store.query_skills_by_vec(embs[0], k=k, status="approved")
         except Exception as exc:
             log.warning("Skill ranking failed: %s", exc)
             return []

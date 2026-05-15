@@ -1,6 +1,7 @@
 """learning.api.approve: skill approval updates DB status."""
 
 import asyncio
+
 import pytest
 
 from agent.daemon.store import RunStore
@@ -10,7 +11,7 @@ from agent.learning.api import approve, reject
 @pytest.fixture
 def store(tmp_path):
     s = RunStore(tmp_path / "runs.db")
-    import asyncio; asyncio.run(s.open())
+    asyncio.run(s.open())
     return s
 
 

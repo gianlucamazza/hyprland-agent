@@ -6,15 +6,12 @@ import io
 
 from PIL import Image
 
-from agent.schemas import Window
 from agent.tools import hypr
 from agent.tools._proc import run as _proc_run
 
 
 async def _grim(*args: str) -> bytes:
-    result = await _proc_run(
-        ["grim", "-t", "png", *args, "-"], capture_stdout=True, timeout=10.0
-    )
+    result = await _proc_run(["grim", "-t", "png", *args, "-"], capture_stdout=True, timeout=10.0)
     if result.returncode != 0:
         raise RuntimeError(f"grim failed: {result.stderr.decode()}")
     return result.stdout

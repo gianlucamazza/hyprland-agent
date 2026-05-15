@@ -34,9 +34,7 @@ def cmd_bind_killswitch() -> None:
         raise typer.Exit(ExitCode.error)
 
     local_agent = Path.home() / ".local" / "bin" / "agent"
-    agent_bin = str(
-        local_agent if local_agent.exists() else shutil.which("agent") or "agent"
-    )
+    agent_bin = str(local_agent if local_agent.exists() else shutil.which("agent") or "agent")
     bind_line = f"bind = SUPER SHIFT, escape, exec, {agent_bin} stop"
 
     text = conf.read_text()

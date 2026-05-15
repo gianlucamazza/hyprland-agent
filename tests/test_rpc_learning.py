@@ -1,9 +1,7 @@
 """RPC dispatch: learning_list / approve / reject / explain."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from agent.daemon.rpc import dispatch
 from agent.ipc.protocol import RpcMethod
@@ -20,13 +18,11 @@ def test_learning_list_dispatches(tmp_path):
     from agent.daemon.store import RunStore
 
     store = RunStore(tmp_path / "runs.db")
-    import asyncio; asyncio.run(store.open())
+    asyncio.run(store.open())
     state = _make_state(store)
 
     async def _run():
-        resp = await dispatch(
-            state, "req-1", RpcMethod.learning_list, {"kind": "skill"}
-        )
+        resp = await dispatch(state, "req-1", RpcMethod.learning_list, {"kind": "skill"})
         assert resp.error is None
         assert "items" in resp.result
 
@@ -37,7 +33,7 @@ def test_learning_approve_skill(tmp_path):
     from agent.daemon.store import RunStore
 
     store = RunStore(tmp_path / "runs.db")
-    import asyncio; asyncio.run(store.open())
+    asyncio.run(store.open())
 
     async def _insert():
         await store.insert_skill("sk1", "name", "desc", '["focus"]', None)
@@ -60,7 +56,7 @@ def test_learning_reject_skill(tmp_path):
     from agent.daemon.store import RunStore
 
     store = RunStore(tmp_path / "runs.db")
-    import asyncio; asyncio.run(store.open())
+    asyncio.run(store.open())
 
     async def _insert():
         await store.insert_skill("sk2", "name", "desc", '["focus"]', None)
@@ -83,7 +79,7 @@ def test_learning_explain_skill(tmp_path):
     from agent.daemon.store import RunStore
 
     store = RunStore(tmp_path / "runs.db")
-    import asyncio; asyncio.run(store.open())
+    asyncio.run(store.open())
 
     async def _insert():
         await store.insert_skill("sk3", "my skill", "my desc", '["focus"]', None)

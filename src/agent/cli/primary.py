@@ -141,6 +141,6 @@ def cmd_tui() -> None:
         from agent.tui.app import AgentApp
 
         AgentApp().run()
-    except ImportError:
+    except ImportError as exc:
         typer.echo("TUI not available.", err=True)
-        raise typer.Exit(ExitCode.error)
+        raise typer.Exit(ExitCode.error) from exc

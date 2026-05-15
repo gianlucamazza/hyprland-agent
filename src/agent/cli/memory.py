@@ -26,9 +26,7 @@ def cmd_search(
         from agent.ipc.protocol import RpcMethod
 
         async with connect(SOCKET_PATH) as c:
-            result = await c.request(
-                RpcMethod.memory_search, {"query": query, "top_k": top_k}
-            )
+            result = await c.request(RpcMethod.memory_search, {"query": query, "top_k": top_k})
         episodes = result.get("episodes", [])
         if not episodes:
             typer.echo("No matching episodes found.")

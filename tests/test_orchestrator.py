@@ -96,9 +96,7 @@ async def test_plan_records_actions_without_executing(
     monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
     monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
     monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
-    monkeypatch.setattr(
-        "agent.orchestrator.screen.full", AsyncMock(return_value=b"png")
-    )
+    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
     monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
     type_text = AsyncMock()
     key = AsyncMock()
@@ -158,9 +156,7 @@ async def test_run_executes_terminal_command_in_owned_terminal(
     monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
     monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
     monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
-    monkeypatch.setattr(
-        "agent.orchestrator.screen.full", AsyncMock(return_value=b"png")
-    )
+    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
     monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
     run_command = AsyncMock(return_value=(0, "", ""))
     monkeypatch.setattr("agent.orchestrator.terminal.run_command", run_command)
@@ -214,9 +210,7 @@ async def test_keyboard_action_blocked_in_control_terminal(
     monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
     monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
     monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
-    monkeypatch.setattr(
-        "agent.orchestrator.screen.full", AsyncMock(return_value=b"png")
-    )
+    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
     monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
     monkeypatch.setattr("agent.orchestrator._process_tree_contains", lambda *_: True)
     type_text = AsyncMock()

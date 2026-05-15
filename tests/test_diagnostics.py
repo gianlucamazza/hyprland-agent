@@ -25,9 +25,7 @@ IGNORED_LINE
     }
 
 
-def test_provider_checks_use_env_file_without_leaking_secret(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_provider_checks_use_env_file_without_leaking_secret(tmp_path: Path, monkeypatch) -> None:
     env_file = tmp_path / "env"
     env_file.write_text("OPENAI_API_KEY=sk-secret\nOPENAI_MODEL=gpt-5.2\n")
     config = AgentConfig(

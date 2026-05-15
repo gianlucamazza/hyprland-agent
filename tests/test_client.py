@@ -10,7 +10,6 @@ import pytest
 
 from agent.client.errors import DaemonUnavailable, ProtocolMismatch, RpcError
 
-
 # ── import-graph enforcement ──────────────────────────────────────────────────
 
 
@@ -31,9 +30,7 @@ def test_client_does_not_import_daemon() -> None:
         text=True,
         check=True,
     )
-    assert result.stdout.strip() == "[]", (
-        f"daemon modules imported: {result.stdout.strip()}"
-    )
+    assert result.stdout.strip() == "[]", f"daemon modules imported: {result.stdout.strip()}"
 
 
 # ── DaemonUnavailable ─────────────────────────────────────────────────────────
@@ -46,10 +43,7 @@ async def test_connect_raises_daemon_unavailable_when_no_socket(tmp_path: Path) 
     with pytest.raises(DaemonUnavailable) as exc_info:
         async with connect(missing):
             pass
-    assert (
-        "not running" in str(exc_info.value).lower()
-        or "daemon" in str(exc_info.value).lower()
-    )
+    assert "not running" in str(exc_info.value).lower() or "daemon" in str(exc_info.value).lower()
     assert str(missing) in exc_info.value.socket_path
 
 

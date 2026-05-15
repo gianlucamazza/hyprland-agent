@@ -69,4 +69,3 @@ brain:
 
     with pytest.raises(ConfigError, match="enabled"):
         load_config(path)
-

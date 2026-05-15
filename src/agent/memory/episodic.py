@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -75,7 +74,7 @@ class EpisodicMemory:
             # Get outcome from run_outcomes table (via store analytics or use status)
             outcome = record.status.value  # fallback
             try:
-                analytics = await self._store.list_analytics(days=9999)
+                await self._store.list_analytics(days=9999)
                 # outcomes per run_id not directly available; use status mapping
             except Exception as exc:
                 log.debug("analytics fetch failed during ingest: %s", exc)

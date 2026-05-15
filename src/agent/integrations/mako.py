@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING
 
 from agent.integrations import CapabilitySpec
 from agent.schemas import Action, ActionKind, ActionResult
-from agent.tools._proc import run as _proc_run, safe_env
+from agent.tools._proc import run as _proc_run
+from agent.tools._proc import safe_env
 
 if TYPE_CHECKING:
     from agent.daemon.state import AppState
@@ -40,7 +41,7 @@ class MakoIntegration:
             )
         ]
 
-    async def setup(self, state: "AppState") -> None:
+    async def setup(self, state: AppState) -> None:
         binary = state.config.integrations.binary_overrides.get(_BINARY, _BINARY)
         if not shutil.which(binary):
             raise RuntimeError(f"{binary!r} not found — mako integration degraded")

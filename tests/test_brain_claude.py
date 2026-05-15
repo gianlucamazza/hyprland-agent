@@ -29,9 +29,7 @@ async def test_custom_hypr_actions_are_queued_without_dispatch(
     monkeypatch.setattr("agent.brain.claude.hypr.dispatch", dispatch)
 
     _, focus_actions = await _handle_custom("focus_window", {"address": "0xabc"})
-    _, dispatch_actions = await _handle_custom(
-        "dispatch_hypr", {"cmd": "workspace 2"}
-    )
+    _, dispatch_actions = await _handle_custom("dispatch_hypr", {"cmd": "workspace 2"})
 
     dispatch.assert_not_awaited()
     assert focus_actions[0].kind == ActionKind.focus_window

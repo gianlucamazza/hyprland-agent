@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 
-import pytest
 from PIL import Image
 
 from agent.awareness.meta_cognition import PostActionVerifier

@@ -25,9 +25,7 @@ class ReflectionEngine:
                 return
 
             action_kinds = [
-                ev.payload.get("kind", "?")
-                for ev in record.events
-                if ev.kind == "action"
+                ev.payload.get("kind", "?") for ev in record.events if ev.kind == "action"
             ]
             blocked_count = sum(
                 1
@@ -38,9 +36,7 @@ class ReflectionEngine:
             polarity = "negative" if outcome in _FAILURE_OUTCOMES else "positive"
             text = self._derive_text(record.task, outcome, action_kinds, blocked_count)
             if text:
-                await self._store.insert_reflection(
-                    run_id, polarity, text, "rule-based"
-                )
+                await self._store.insert_reflection(run_id, polarity, text, "rule-based")
                 log.debug("Stored %s reflection for run %s", polarity, run_id)
         except Exception as exc:
             log.warning("Reflection failed for run %s: %s", run_id, exc)
@@ -58,11 +54,7 @@ class ReflectionEngine:
                 "Verify the target app is in the allowlist before attempting."
             )
         if outcome == "stuck":
-            repeated = (
-                max(set(action_kinds), key=action_kinds.count)
-                if action_kinds
-                else "unknown"
-            )
+            repeated = max(set(action_kinds), key=action_kinds.count) if action_kinds else "unknown"
             return (
                 f"For task '{task}': got stuck repeating '{repeated}'. "
                 "Try a different strategy or target element."

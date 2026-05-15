@@ -32,7 +32,7 @@ async def populated_store(tmp_path: Path) -> RunStore:
     await s.open()
 
     embedder = _DeterministicEmbedder()
-    mem = EpisodicMemory(s, embedder)
+    EpisodicMemory(s, embedder)
 
     episodes = [
         ("r1", "open ghostty", "success"),
@@ -55,7 +55,7 @@ async def populated_store(tmp_path: Path) -> RunStore:
             run_id=run_id,
             task=task,
             outcome=outcome,
-            summary=f"1 actions",
+            summary="1 actions",
             context_class=None,
             actions_json="[]",
         )

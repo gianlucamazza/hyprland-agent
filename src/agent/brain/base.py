@@ -12,8 +12,6 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class Brain(Protocol):
-    async def decide(
-        self, state: ScreenState, task: str, ctx: BrainContext
-    ) -> list[Action]:
+    async def decide(self, state: ScreenState, task: str, ctx: BrainContext) -> list[Action]:
         """Given screen state, task description, and brain context, return actions."""
         ...

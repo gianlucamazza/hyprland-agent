@@ -59,9 +59,7 @@ class RuleMiner:
                 " WHERE run_id=? AND kind='action' ORDER BY seq",
                 (run_id,),
             ).fetchall()
-            action_kinds = [
-                json.loads(e["payload_json"]).get("kind", "?") for e in events
-            ]
+            action_kinds = [json.loads(e["payload_json"]).get("kind", "?") for e in events]
             if not action_kinds:
                 continue
             key = (context_class, json.dumps(action_kinds))
@@ -79,17 +77,13 @@ class RuleMiner:
                         {
                             "on": "openwindow",
                             "match": {"class": context_class},
-                            "actions": [
-                                {"log": f"auto: {', '.join(action_kinds[:3])}"}
-                            ],
+                            "actions": [{"log": f"auto: {', '.join(action_kinds[:3])}"}],
                         }
                     ]
                 },
                 default_flow_style=False,
             )
-            rule_id = hashlib.md5(
-                f"{context_class}|{actions_json}".encode()
-            ).hexdigest()
+            rule_id = hashlib.md5(f"{context_class}|{actions_json}".encode()).hexdigest()
             source_runs = json.dumps(run_ids_map[(context_class, actions_json)][:5])
             conn.execute(
                 "INSERT OR IGNORE INTO learned_rules"

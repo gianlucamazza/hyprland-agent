@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from enum import IntEnum
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -22,7 +22,7 @@ class ExitCode(IntEnum):
 
 
 _BrainOpt = Annotated[
-    Optional[str],
+    str | None,
     typer.Option(
         "--brain",
         "-b",
@@ -44,10 +44,10 @@ def _run(coro) -> None:
         asyncio.run(coro)
     except DaemonUnavailable as exc:
         typer.echo(str(exc), err=True)
-        raise typer.Exit(ExitCode.daemon_unavailable)
+        raise typer.Exit(ExitCode.daemon_unavailable) from exc
     except RpcError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(ExitCode.error)
+        raise typer.Exit(ExitCode.error) from exc
     except KeyboardInterrupt:
         pass
 

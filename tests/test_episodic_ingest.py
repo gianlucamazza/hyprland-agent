@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 
@@ -30,9 +29,7 @@ def embedder() -> _StubEmbedder:
     return _StubEmbedder()
 
 
-async def _insert_run(
-    store: RunStore, run_id: str, task: str, status: RunStatus
-) -> None:
+async def _insert_run(store: RunStore, run_id: str, task: str, status: RunStatus) -> None:
     summary = RunSummary(
         run_id=run_id,
         kind=RunKind.run,
@@ -45,16 +42,12 @@ async def _insert_run(
     await store.update_run_status(run_id, status)
 
 
-async def test_ingest_populates_episodes(
-    store: RunStore, embedder: _StubEmbedder
-) -> None:
+async def test_ingest_populates_episodes(store: RunStore, embedder: _StubEmbedder) -> None:
     await _insert_run(store, "r1", "open ghostty", RunStatus.completed)
     # Add an action event
     await store.append_event(
         "r1",
-        RunEventRecord(
-            seq=0, ts=time.time(), kind="action", payload={"kind": "dispatch_hypr"}
-        ),
+        RunEventRecord(seq=0, ts=time.time(), kind="action", payload={"kind": "dispatch_hypr"}),
     )
 
     mem = EpisodicMemory(store, embedder)
@@ -68,17 +61,13 @@ async def test_ingest_populates_episodes(
     assert "dispatch_hypr" in row[4]  # summary
 
 
-async def test_ingest_missing_run_is_silent(
-    store: RunStore, embedder: _StubEmbedder
-) -> None:
+async def test_ingest_missing_run_is_silent(store: RunStore, embedder: _StubEmbedder) -> None:
     mem = EpisodicMemory(store, embedder)
     # Should not raise
     await mem.ingest("nonexistent-run-id")
 
 
-async def test_ingest_extracts_context_class(
-    store: RunStore, embedder: _StubEmbedder
-) -> None:
+async def test_ingest_extracts_context_class(store: RunStore, embedder: _StubEmbedder) -> None:
     await _insert_run(store, "r2", "focus browser", RunStatus.completed)
     await store.append_event(
         "r2",
@@ -91,9 +80,7 @@ async def test_ingest_extracts_context_class(
     )
     await store.append_event(
         "r2",
-        RunEventRecord(
-            seq=1, ts=time.time(), kind="action", payload={"kind": "focus_window"}
-        ),
+        RunEventRecord(seq=1, ts=time.time(), kind="action", payload={"kind": "focus_window"}),
     )
 
     mem = EpisodicMemory(store, embedder)
@@ -102,16 +89,12 @@ async def test_ingest_extracts_context_class(
     import sqlite3
 
     with sqlite3.connect(str(store._path)) as conn:
-        row = conn.execute(
-            "SELECT context_class FROM episodes WHERE run_id='r2'"
-        ).fetchone()
+        row = conn.execute("SELECT context_class FROM episodes WHERE run_id='r2'").fetchone()
     assert row is not None
     assert row[0] == "firefox"
 
 
-async def test_ingest_blocked_count_in_summary(
-    store: RunStore, embedder: _StubEmbedder
-) -> None:
+async def test_ingest_blocked_count_in_summary(store: RunStore, embedder: _StubEmbedder) -> None:
     await _insert_run(store, "r3", "open 1password", RunStatus.errored)
     await store.append_event(
         "r3",

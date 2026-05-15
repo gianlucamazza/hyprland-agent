@@ -111,9 +111,7 @@ async def list_proposals(
             for r in rows
         ]
     else:
-        raise ValueError(
-            f"Unknown proposal kind: {kind!r} — expected skill|rule|allowlist"
-        )
+        raise ValueError(f"Unknown proposal kind: {kind!r} — expected skill|rule|allowlist")
 
 
 async def approve(
@@ -139,9 +137,7 @@ async def approve(
 
     elif kind == "allowlist":
         rows = await store.list_allowlist_proposals(status=None)
-        prop = next(
-            (r for r in rows if str(r["proposal_id"]) == str(proposal_id)), None
-        )
+        prop = next((r for r in rows if str(r["proposal_id"]) == str(proposal_id)), None)
         if prop is None:
             raise KeyError(f"allowlist proposal {proposal_id!r} not found")
 
@@ -211,9 +207,7 @@ async def explain(
         }
     elif kind == "allowlist":
         rows = await store.list_allowlist_proposals(status=None)
-        prop = next(
-            (r for r in rows if str(r["proposal_id"]) == str(proposal_id)), None
-        )
+        prop = next((r for r in rows if str(r["proposal_id"]) == str(proposal_id)), None)
         if prop is None:
             raise KeyError(f"allowlist proposal {proposal_id!r} not found")
         return {
@@ -239,18 +233,13 @@ def _append_learned_rule(rule_yaml: str) -> None:
 
     new_rules = (yaml.safe_load(rule_yaml) or {}).get("rules", [])
     existing_rules.extend(new_rules)
-    _LEARNED_RULES_PATH.write_text(
-        yaml.dump({"rules": existing_rules}, default_flow_style=False)
-    )
+    _LEARNED_RULES_PATH.write_text(yaml.dump({"rules": existing_rules}, default_flow_style=False))
 
 
 def _append_allowlist_entry(app_class: str, title_pat: str) -> None:
     """Append an entry to allowlist.yaml (create if missing)."""
     _ALLOWLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    if _ALLOWLIST_PATH.exists():
-        existing = yaml.safe_load(_ALLOWLIST_PATH.read_text()) or {}
-    else:
-        existing = {}
+    existing = yaml.safe_load(_ALLOWLIST_PATH.read_text()) or {} if _ALLOWLIST_PATH.exists() else {}
     allow: list = existing.get("allow", [])
     entry = {"class": app_class, "title": title_pat}
     if entry not in allow:

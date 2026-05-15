@@ -71,9 +71,7 @@ async def test_reflect_stuck_mentions_repeated_action(store: RunStore) -> None:
     for i in range(4):
         await store.append_event(
             "r3",
-            RunEventRecord(
-                seq=i, ts=time.time(), kind="action", payload={"kind": "scroll"}
-            ),
+            RunEventRecord(seq=i, ts=time.time(), kind="action", payload={"kind": "scroll"}),
         )
 
     engine = ReflectionEngine(store)

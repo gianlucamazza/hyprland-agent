@@ -9,7 +9,7 @@ import pytest
 
 from agent.daemon.store import RunStore
 from agent.learning.rules import RuleMiner
-from agent.schemas import RunEventRecord, RunKind, RunStatus, RunSummary
+from agent.schemas import RunEventRecord, RunStatus, RunSummary
 
 
 @pytest.fixture
@@ -29,9 +29,7 @@ def _summary(task: str) -> RunSummary:
     )
 
 
-async def _make_run(
-    store: RunStore, task: str, ctx_class: str, kinds: list[str]
-) -> str:
+async def _make_run(store: RunStore, task: str, ctx_class: str, kinds: list[str]) -> str:
     s = _summary(task)
     await store.insert_run(s)
     for seq, k in enumerate(kinds):

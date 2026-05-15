@@ -6,9 +6,7 @@ from agent.tools._proc import run as _proc_run
 
 
 async def read() -> str:
-    result = await _proc_run(
-        ["wl-paste", "--no-newline"], capture_stdout=True, timeout=5.0
-    )
+    result = await _proc_run(["wl-paste", "--no-newline"], capture_stdout=True, timeout=5.0)
     return result.stdout.decode()
 
 

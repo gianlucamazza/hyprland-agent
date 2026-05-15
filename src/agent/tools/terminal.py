@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 EmitFn = Callable[[str, dict], Awaitable[None]]
 
@@ -30,9 +30,7 @@ async def run_command(
     Returns (returncode, stdout, stderr). stdout/stderr are empty when visible=True.
     """
     if visible:
-        return await _run_visible(
-            command, run_id=run_id, emit=emit, timeout=timeout, hold_s=hold_s
-        )
+        return await _run_visible(command, run_id=run_id, emit=emit, timeout=timeout, hold_s=hold_s)
     return await _run_capture(command, run_id=run_id, emit=emit, timeout=timeout)
 
 
@@ -63,7 +61,7 @@ async def _run_visible(
     )
     try:
         code = await asyncio.wait_for(proc.wait(), timeout=timeout)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await _terminate_process(proc)
         if emit is not None:
             await emit("terminal_timed_out", {"title": title, "timeout_s": timeout})
@@ -75,9 +73,7 @@ async def _run_visible(
         raise
 
     if emit is not None:
-        await emit(
-            "terminal_exited", {"title": title, "returncode": code, "visible": True}
-        )
+        await emit("terminal_exited", {"title": title, "returncode": code, "visible": True})
     if code != 0:
         raise RuntimeError(f"terminal command exited with status {code}")
     return code, "", ""
@@ -104,7 +100,7 @@ async def _run_capture(
     )
     try:
         stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         await proc.wait()
         if emit is not None:
@@ -169,7 +165,7 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
 
     try:
         await asyncio.wait_for(proc.wait(), timeout=2.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         try:
             if proc.pid is not None:
                 os.killpg(proc.pid, signal.SIGKILL)

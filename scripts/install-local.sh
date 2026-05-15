@@ -133,6 +133,14 @@ for name in "${script_names[@]}"; do
 	launcher_lines+=("Launcher:    $link -> $script_bin")
 done
 
+# --- Copy .env template if missing ---
+env_dest="$HOME/.config/hyprland-agent/env"
+if [[ ! -f "$env_dest" && -f "$repo_root/.env.example" ]]; then
+	mkdir -p "$(dirname "$env_dest")"
+	install -Dm600 "$repo_root/.env.example" "$env_dest"
+	echo "Created template: $env_dest (edit before adding provider keys)"
+fi
+
 # --- Systemd: optional ---
 if [[ -z "$skip_systemd" ]] && command -v systemctl &>/dev/null; then
 	agent_launcher="$bin_dir/agent"

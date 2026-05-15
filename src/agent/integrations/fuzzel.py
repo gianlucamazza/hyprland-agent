@@ -37,7 +37,7 @@ class FuzzelIntegration:
             )
         ]
 
-    async def setup(self, state: "AppState") -> None:
+    async def setup(self, state: AppState) -> None:
         binary = state.config.integrations.binary_overrides.get(_BINARY, _BINARY)
         if not shutil.which(binary):
             raise RuntimeError(f"{binary!r} not found — fuzzel integration degraded")

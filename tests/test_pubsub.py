@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
-import pytest
-
 from agent.daemon.pubsub import PubSub
 from agent.ipc.protocol import Topic
 

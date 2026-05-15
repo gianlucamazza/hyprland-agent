@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 from pathlib import Path
@@ -56,16 +57,14 @@ async def _handle_connection(
             try:
                 payload = await asyncio.wait_for(sub.queue.get(), timeout=1.0)
                 await outbound.put(EventFrame(topic=topic, payload=payload))
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
 
     async def _writer() -> None:
         while not stop.is_set():
             try:
-                frame = await asyncio.wait_for(
-                    outbound.get(), timeout=HEARTBEAT_INTERVAL
-                )
-            except asyncio.TimeoutError:
+                frame = await asyncio.wait_for(outbound.get(), timeout=HEARTBEAT_INTERVAL)
+            except TimeoutError:
                 frame = PingFrame()
             try:
                 writer.write(encode_frame(frame))
@@ -85,9 +84,7 @@ async def _handle_connection(
             return
 
         if not isinstance(frame, HelloFrame):
-            await _write_raw(
-                make_error_response("", "expected hello frame", code="protocol_error")
-            )
+            await _write_raw(make_error_response("", "expected hello frame", code="protocol_error"))
             stop.set()
             return
 
@@ -113,9 +110,7 @@ async def _handle_connection(
                 continue
 
             if isinstance(frame, RequestFrame):
-                response = await rpc_module.dispatch(
-                    state, frame.id, frame.method, frame.params
-                )
+                response = await rpc_module.dispatch(state, frame.id, frame.method, frame.params)
                 await outbound.put(response)
 
             elif isinstance(frame, SubscribeFrame):
@@ -154,10 +149,8 @@ async def _handle_connection(
         await state.pubsub.unsubscribe(topic, sub)
 
     writer.close()
-    try:
+    with contextlib.suppress(Exception):
         await writer.wait_closed()
-    except Exception:
-        pass
 
     log.debug("Client disconnected: %s", peer)
 

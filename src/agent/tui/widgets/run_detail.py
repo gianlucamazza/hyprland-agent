@@ -42,6 +42,7 @@ class RunDetail(Widget):
     def __init__(self) -> None:
         super().__init__()
         self._run_id: str | None = None
+        self._bg_tasks: set[asyncio.Task] = set()
 
     def compose(self) -> ComposeResult:
         yield Static("No run selected", id="run-header")
@@ -49,7 +50,9 @@ class RunDetail(Widget):
 
     def load(self, run_id: str, conn: DaemonConnection) -> None:
         self._run_id = run_id
-        asyncio.create_task(self._fetch(run_id, conn))
+        t = asyncio.create_task(self._fetch(run_id, conn))
+        self._bg_tasks.add(t)
+        t.add_done_callback(self._bg_tasks.discard)
 
     async def _fetch(self, run_id: str, conn: DaemonConnection) -> None:
         try:

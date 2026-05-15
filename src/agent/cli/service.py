@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
@@ -15,7 +15,7 @@ service_app = typer.Typer(help="Daemon lifecycle (start, install systemd unit)")
 @service_app.command("start")
 def cmd_start(
     socket: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--socket", "-s", help="Override socket path"),
     ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
@@ -57,9 +57,7 @@ def cmd_install() -> None:
         typer.echo(f"Removed {old_path}")
 
     local_agent = Path.home() / ".local" / "bin" / "agent"
-    agent_bin = str(
-        local_agent if local_agent.exists() else shutil.which("agent") or "agent"
-    )
+    agent_bin = str(local_agent if local_agent.exists() else shutil.which("agent") or "agent")
     unit_content = f"""[Unit]
 Description=Hyprland agent daemon
 After=graphical-session.target
@@ -85,3 +83,44 @@ WantedBy=graphical-session.target
     subprocess.run(["systemctl", "--user", "enable", "--now", new_unit], check=True)
     typer.echo(f"✓ {new_unit} enabled and started.")
     typer.echo("Run 'agent doctor' to verify.")
+
+
+@service_app.command("uninstall")
+def cmd_uninstall(
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation prompt")] = False,
+) -> None:
+    """Remove config, cache, and systemd unit (keeps ~/.cache/fastembed)."""
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    targets = [
+        Path.home() / ".config" / "hyprland-agent",
+        Path.home() / ".cache" / "hyprland-agent",
+        Path.home() / ".config" / "systemd" / "user" / "hyprland-agent.service",
+    ]
+    existing = [t for t in targets if t.exists()]
+    if not existing:
+        typer.echo("Nothing to remove.")
+        raise typer.Exit()
+
+    if not yes:
+        typer.echo("Will remove:")
+        for t in existing:
+            typer.echo(f"  {t}")
+        typer.echo("  (note: ~/.cache/fastembed is kept — shared with other tools)")
+        typer.confirm("Proceed?", abort=True)
+
+    unit_name = "hyprland-agent.service"
+    subprocess.run(["systemctl", "--user", "stop", unit_name], check=False, capture_output=True)
+    subprocess.run(["systemctl", "--user", "disable", unit_name], check=False, capture_output=True)
+
+    for t in existing:
+        if t.is_dir():
+            shutil.rmtree(t)
+        else:
+            t.unlink()
+        typer.echo(f"Removed {t}")
+
+    subprocess.run(["systemctl", "--user", "daemon-reload"], check=False, capture_output=True)
+    typer.echo("Uninstall complete.")
