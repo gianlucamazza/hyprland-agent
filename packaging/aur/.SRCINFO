@@ -1,0 +1,25 @@
+pkgbase = hyprland-agent
+	pkgdesc = Local-first agentic desktop controller for Hyprland / Wayland
+	pkgver = 1.0.0
+	pkgrel = 1
+	url = https://github.com/gianlucamazza/hyprland-agent
+	arch = any
+	license = Apache-2.0
+	makedepends = python-installer
+	makedepends = python-build
+	makedepends = uv
+	depends = python>=3.13
+	depends = wtype
+	depends = ydotool
+	depends = grim
+	depends = wl-clipboard
+	depends = sqlite
+	optdepends = mako: desktop notifications via notify-send
+	optdepends = waybar: agent-waybar status module
+	optdepends = fuzzel: fuzzel-agent task launcher
+	provides = hyprland-agent
+	conflicts = hyprland-agent
+	source = hyprland-agent-1.0.0.tar.gz::https://github.com/gianlucamazza/hyprland-agent/archive/refs/tags/v1.0.0.tar.gz
+	sha256sums = e85501f2d608733cc6d3216ffc3c3003108939bae63a576cf3810ca8b1a78b43
+
+pkgname = hyprland-agent
