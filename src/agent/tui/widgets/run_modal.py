@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -9,6 +11,9 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select
 
 from agent.ipc.protocol import RpcMethod
+
+if TYPE_CHECKING:
+    from agent.tui.app import AgentApp
 
 _LABELS = {
     "claude": "Claude",
@@ -101,7 +106,10 @@ class RunModal(ModalScreen[str | None]):
         brain_val = self.query_one("#brain-select", Select).value
         brain = str(brain_val) if brain_val is not Select.BLANK else "auto"
         method = RpcMethod.plan_task if event.button.id == "plan-btn" else RpcMethod.run_task
-        conn = self.app._conn  # type: ignore[attr-defined]
+        conn = cast(AgentApp, self.app)._conn
+        if conn is None:
+            self.notify("Daemon not connected", severity="error")
+            return
         try:
             result = await conn.request(
                 method,

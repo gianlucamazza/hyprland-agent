@@ -129,7 +129,7 @@ class RuleAction(BaseModel):
 
 class Rule(BaseModel):
     on: EventKind
-    match: EventMatch = Field(default_factory=EventMatch)
+    match: EventMatch = Field(default_factory=EventMatch.model_construct)
     actions: list[RuleAction]
 
     @classmethod

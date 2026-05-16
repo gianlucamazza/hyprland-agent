@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING, cast
 
 from textual.widgets import Static
 
 from agent.ipc.protocol import RpcMethod
+
+if TYPE_CHECKING:
+    from agent.tui.app import AgentApp
 
 
 class StatusBar(Static):
@@ -33,7 +37,7 @@ class StatusBar(Static):
         self.set_interval(5.0, self._spawn)
 
     async def _refresh(self) -> None:
-        conn = self.app._conn  # type: ignore[attr-defined]
+        conn = cast(AgentApp, self.app)._conn
         if conn is None:
             return
         try:

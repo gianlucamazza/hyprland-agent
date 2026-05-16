@@ -42,9 +42,9 @@ def decode_frame(line: bytes) -> Frame:
         raise FrameParseError(f"schema error: {exc}") from exc
 
 
-def encode_frame(frame: Frame) -> bytes:  # type: ignore[valid-type]
+def encode_frame(frame: Frame) -> bytes:
     """Serialize a Frame to a NDJSON line (includes trailing newline)."""
-    return (frame.model_dump_json() + "\n").encode()  # type: ignore[union-attr]
+    return (frame.model_dump_json() + "\n").encode()
 
 
 async def read_frame(reader: asyncio.StreamReader) -> Frame:
@@ -65,7 +65,7 @@ async def read_frame(reader: asyncio.StreamReader) -> Frame:
 
 async def write_frame(
     writer: asyncio.StreamWriter,
-    frame: Frame,  # type: ignore[valid-type]
+    frame: Frame,
 ) -> None:
     """Write one NDJSON frame to *writer* and flush."""
     writer.write(encode_frame(frame))

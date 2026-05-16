@@ -9,7 +9,7 @@ import sqlite3
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agent.schemas import RunEventRecord, RunKind, RunRecord, RunStatus, RunSummary
 
@@ -313,7 +313,8 @@ class RunStore:
         action_count: int | None,
         duration_s: float | None,
     ) -> None:
-        sets, vals = [], []
+        sets: list[str] = []
+        vals: list[Any] = []
         if iterations is not None:
             sets.append("iterations=?")
             vals.append(iterations)
@@ -915,15 +916,22 @@ class RunStore:
         )
         conn.commit()
 
-    async def list_allowlist_proposals(self, status: str = "pending") -> list[dict]:
+    async def list_allowlist_proposals(self, status: str | None = "pending") -> list[dict]:
         return await self._run_sync(self._do_list_allowlist_proposals, status)
 
-    def _do_list_allowlist_proposals(self, conn: sqlite3.Connection, status: str) -> list[dict]:
+    def _do_list_allowlist_proposals(
+        self, conn: sqlite3.Connection, status: str | None
+    ) -> list[dict]:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT * FROM allowlist_proposals WHERE status=? ORDER BY hit_count DESC",
-            (status,),
-        ).fetchall()
+        if status is None:
+            rows = conn.execute(
+                "SELECT * FROM allowlist_proposals ORDER BY hit_count DESC"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM allowlist_proposals WHERE status=? ORDER BY hit_count DESC",
+                (status,),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     async def update_allowlist_proposal_status(self, proposal_id: int, status: str) -> None:

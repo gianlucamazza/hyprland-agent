@@ -88,7 +88,7 @@ def cmd_show(
     config_yaml = config_dir / "config.yaml"
     if config_yaml.exists():
         try:
-            import yaml  # type: ignore
+            import yaml
 
             with open(config_yaml) as f:
                 cfg["config_yaml"] = yaml.safe_load(f)

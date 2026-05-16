@@ -42,9 +42,9 @@ async def active() -> bytes:
 
 def resize(png: bytes, scale: float = 0.5) -> bytes:
     """Downscale screenshot for vision model token efficiency."""
-    img = Image.open(io.BytesIO(png))
+    img: Image.Image = Image.open(io.BytesIO(png))
     new_size = (int(img.width * scale), int(img.height * scale))
-    img = img.resize(new_size, Image.LANCZOS)
+    img = img.resize(new_size, Image.Resampling.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()

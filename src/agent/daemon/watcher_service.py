@@ -5,11 +5,15 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 
 from agent.daemon.rule_runner import execute_rule, match_event
 from agent.schemas import Rule
+
+if TYPE_CHECKING:
+    from agent.daemon.state import AppState
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +81,7 @@ async def load_rules() -> list[Rule]:
         return []
 
 
-async def run_watcher(state) -> None:  # type: ignore[type-arg]
+async def run_watcher(state: AppState) -> None:
     """Subscribe to Hyprland events and execute matching rules.
 
     Runs until cancelled. Each rule action is isolated: a slow or failing

@@ -51,7 +51,9 @@ class PostActionVerifier:
         """Return an 8-byte dHash hex string for *png_bytes*."""
         from PIL import Image
 
-        img = Image.open(io.BytesIO(png_bytes)).convert("L").resize((9, 8), Image.LANCZOS)
+        img = (
+            Image.open(io.BytesIO(png_bytes)).convert("L").resize((9, 8), Image.Resampling.LANCZOS)
+        )
         pixels = img.tobytes()  # grayscale: each byte is one pixel intensity
         bits = []
         for row in range(8):

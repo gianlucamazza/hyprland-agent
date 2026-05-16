@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-05-16
+
+### Fixed
+
+- **mypy clean**: resolved all 17 pre-existing type errors across `schemas.py`, `allowlist.py`, `ipc/framing.py`, `daemon/store.py`, `daemon/watcher_service.py`, `cli/config.py`, `tools/screen.py`, `awareness/meta_cognition.py`, `tui/widgets/status_bar.py`, `tui/widgets/run_modal.py`, `learning/api.py`. `Image.LANCZOS` → `Image.Resampling.LANCZOS` (modern Pillow API); removed `unused type: ignore` comments; added explicit type annotations; `DaemonConnection | None` narrowed correctly in TUI widgets via `cast(AgentApp, self.app)`.
+- `tui/widgets/run_modal.py`: submitting a task when the daemon is not connected now shows a `"Daemon not connected"` notification instead of crashing with `AttributeError`.
+- `daemon/store.py`: `list_allowlist_proposals(status=None)` now returns all proposals regardless of status (previously would have returned zero rows due to `WHERE status=NULL`).
+
 ## [1.1.0] - 2026-05-16
 
 ### Added

@@ -102,6 +102,6 @@ def create_default_config() -> None:
         return
     # Deny-all default — edit this file to allow specific windows.
     # Example entry: {class: foot, title: "*"}
-    example = {"allow": []}
+    example: dict[str, list] = {"allow": []}
     with open(_CONFIG_PATH, "w") as f:
         yaml.dump(example, f, default_flow_style=False)
