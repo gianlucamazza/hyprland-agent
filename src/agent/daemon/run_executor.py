@@ -8,7 +8,10 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from agent.daemon.state import AppState
 
 from agent.daemon.audit_log import AuditLog
 from agent.daemon.pubsub import PubSub
@@ -39,7 +42,16 @@ class RunExecutor:
         self._audit = audit
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._seq: dict[str, int] = {}
-        self.app_state: Any = None  # set by AppState.open() after construction
+        self._app_state: AppState | None = None
+
+    def set_app_state(self, app_state: AppState) -> None:
+        self._app_state = app_state
+
+    @property
+    def app_state(self) -> AppState:
+        if self._app_state is None:
+            raise RuntimeError("RunExecutor used before set_app_state()")
+        return self._app_state
 
     # ------------------------------------------------------------------
     # Public API

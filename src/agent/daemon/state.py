@@ -24,6 +24,7 @@ class AppState:
         self.pubsub = PubSub()
         self.audit = AuditLog(enabled=self.config.audit_log)
         self.executor = RunExecutor(self.store, self.pubsub, self.audit)
+        self.executor.set_app_state(self)
         self.integrations = IntegrationRegistry()
         self.rules: list[Rule] = []
         self.start_time: float = 0.0
@@ -37,7 +38,6 @@ class AppState:
         self.start_time = time.time()
         await self.store.open()
         await self.audit.open()
-        self.executor.app_state = self
         cfg = self.config.integrations
         enabled = cfg.enabled if cfg.enabled else None
         await self.integrations.load(self, enabled=enabled)
