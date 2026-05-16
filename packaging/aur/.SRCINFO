@@ -1,7 +1,7 @@
 pkgbase = hyprland-agent
 	pkgdesc = Local-first agentic desktop controller for Hyprland / Wayland
 	pkgver = 1.0.0
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/gianlucamazza/hyprland-agent
 	arch = any
 	license = Apache-2.0
@@ -9,6 +9,18 @@ pkgbase = hyprland-agent
 	makedepends = python-build
 	makedepends = uv
 	depends = python>=3.13
+	depends = python-pydantic
+	depends = python-typer
+	depends = python-textual
+	depends = python-httpx
+	depends = python-openai
+	depends = python-aiohttp
+	depends = python-yaml
+	depends = python-pillow
+	depends = python-jeepney
+	depends = python-anthropic
+	depends = python-sqlite-vec
+	depends = python-fastembed
 	depends = wtype
 	depends = ydotool
 	depends = grim
