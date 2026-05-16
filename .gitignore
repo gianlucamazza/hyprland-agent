@@ -16,3 +16,13 @@ wheels/
 
 # Test artifacts
 snapshot_report.html
+
+# makepkg build artifacts
+packaging/aur/src/
+packaging/aur/pkg/
+packaging/aur/*.pkg.tar.zst
+packaging/aur/*.tar.gz
+
+# Coverage
+.coverage
+coverage.xml
