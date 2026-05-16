@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-16
+
+### Added
+
+- `src/agent/paths.py` — centralized OS path constants and binary resolution
+  helpers: `HYPR_CONF_PATH`, `SERVICE_UNIT_NAME`, `SYSTEMD_USER_DIR`,
+  `resolve_agent_bin()`.
+- CLI flag completeness on destructive and scriptable commands:
+  - `agent learning approve <kind> <id>` — `--yes` (skip confirmation),
+    `--json` (machine-readable output).
+  - `agent config init-allowlist` — `--yes` (skip overwrite confirmation).
+  - `agent config bind-killswitch` — `--yes`, `--force` (rewrite even if a
+    bind already exists, e.g. after the agent binary path changed).
+  - `agent service install` — `--yes`, `--dry-run` (print unit content +
+    systemctl commands without writing or reloading).
+  - `agent runs cancel` — `--json`.
+  - `agent runs feedback` — `--json`.
+- 7 new tests in `tests/test_cli_commands.py` covering the new flag paths.
+
+### Changed
+
+- `src/agent/cli/config.py`, `cli/service.py`, `diagnostics.py` — replaced
+  inline `Path.home() / ".config" / ...` and `shutil.which("agent")` boilerplate
+  with the shared helpers in `agent.paths`. ~15 LOC of duplication removed.
+- `src/agent/daemon/run_executor.py` / `daemon/state.py` —
+  `RunExecutor.set_app_state()` setter + property replaces the bare
+  `self.app_state: Any = None` back-ref. Binding happens in `AppState.__init__`
+  instead of `open()`, so the reference is valid for the full object lifetime;
+  the property safe-fails with `RuntimeError` if accessed before set.
+- `src/agent/diagnostics.py` — `_anthropic_key`, `_anthropic_model`,
+  `_provider_checks`, `_brain_config_checks` now accept an optional pre-loaded
+  `AgentConfig`; `run_all()` loads the config once and threads it through.
+- `src/agent/config.py` — `CACHE_DIR` promoted to module-level constant
+  (was duplicated across `killswitch.py`, `store.py`, `audit_log.py`,
+  `self_model.py`, `cli/config.py`, `diagnostics.py`).
+- `pyproject.toml` — upper bounds on `pydantic<3`, `textual<9`, `typer<1`,
+  `rich>=15,<16`. Aligns caps with current locked majors; avoids silent
+  breakage on next major release.
+- `.pre-commit-config.yaml` — ruff pre-commit rev `v0.11.12` → `v0.15.9`.
+
+### Fixed
+
+- `tests/test_cli_commands.py::test_cmd_stop_with_yes` — closing the patched
+  coroutine via `coro.close()` silences the `RuntimeWarning` that previously
+  leaked into `test_learning_list_allowlist`.
+- `src/agent/diagnostics.py::_env_value` — default-argument capture made
+  `_read_env_file()` immune to test monkeypatching of `ENV_FILE_PATH`; now
+  passes the path explicitly.
+
 ## [1.2.0] - 2026-05-16
 
 ### Added

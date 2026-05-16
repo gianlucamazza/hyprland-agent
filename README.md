@@ -343,6 +343,8 @@ agent stop
 # Service management
 agent service start -v         # run daemon in foreground (debug)
 agent service install          # install systemd user unit
+agent service install --dry-run  # preview unit + systemctl commands without writing
+agent service install --yes      # non-interactive (scripts / CI)
 agent service uninstall        # remove config + cache + systemd unit
 
 # Integrations
