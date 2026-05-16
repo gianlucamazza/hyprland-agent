@@ -41,7 +41,8 @@ async def inject_context(
         try:
             mem_cfg = getattr(state.config, "memory", None)
             k = mem_cfg.recall_k if mem_cfg is not None else 3
-            episodes = await episodic.recall(task, k=k)
+            ff = mem_cfg.filter_failure_in_recall if mem_cfg is not None else True
+            episodes = await episodic.recall(task, k=k, filter_failure=ff)
             recall = [ep.to_dict() for ep in episodes]
         except Exception as exc:
             log.warning("Episodic recall failed: %s", exc)
@@ -51,6 +52,8 @@ async def inject_context(
         try:
             rows = await store.list_recent_reflections(polarity="negative", limit=20)
             negative_reflections = [r["text"] for r in rows[:3]]
+            for r in rows:
+                await store.touch_memory("reflections", "run_id", r["run_id"])
         except Exception as exc:
             log.warning("Reflection fetch failed: %s", exc)
 

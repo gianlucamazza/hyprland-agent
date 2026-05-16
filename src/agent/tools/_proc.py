@@ -8,24 +8,9 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-log = logging.getLogger(__name__)
+from agent.config import ENV_WHITELIST
 
-# Env vars forwarded to integration subprocesses — no credentials leaked.
-ENV_WHITELIST: frozenset[str] = frozenset(
-    {
-        "PATH",
-        "HOME",
-        "USER",
-        "DISPLAY",
-        "WAYLAND_DISPLAY",
-        "XDG_RUNTIME_DIR",
-        "XDG_SESSION_TYPE",
-        "HYPRLAND_INSTANCE_SIGNATURE",
-        "DBUS_SESSION_BUS_ADDRESS",
-        "LANG",
-        "LC_ALL",
-    }
-)
+log = logging.getLogger(__name__)
 
 
 @dataclass

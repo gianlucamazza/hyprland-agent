@@ -63,7 +63,7 @@ Brain aliases: `kimi` is a canonical alias for `moonshot` (see `BRAIN_ALIASES` i
 - **Allowlist defaults to deny-all**. Password-manager class names (`1password`, `_1password`, `keepassxc`, `gnome-keyring`) are always blocked regardless of the allowlist.
 - **NDJSON frame size cap is 1 MiB** (`ipc/constants.py`). Protocol version 1.0; major-version mismatches are rejected.
 - **Provider enablement is config-driven**. Explicit `--brain openai` or `--brain claude` fails if that provider is disabled in `config.yaml`; `auto` skips disabled or uncredentialed providers.
-- **sqlite-vec loaded per-connection**: `_run_vec_sync` calls `_load_vec0(conn)` on every invocation. `_run_sync` does NOT load vec0. Do not call vec queries through `_run_sync` or they will silently return empty results.
+- **sqlite-vec loaded per-connection**: `run_vec_sync` calls `_load_vec0(conn)` on every invocation. `run_sync` does NOT load vec0. Do not call vec queries through `run_sync` or they will silently return empty results.
 - **`intfloat/multilingual-e5-large` model is ~1.3 GB** and downloaded lazily on first embed call to `~/.cache/fastembed`. Mark tests that need the real embedder with `@pytest.mark.slow`; stub it with `[[0.1]*1024]` for unit tests.
 - **`watcher_service.load_rules()`** merges `rules.yaml` and `learned_rules.yaml` with dedup by `(on, match)` key. Duplicate rules across both files are silently dropped.
 - **Memory decay (v5 schema)** adds `decay_score` and `last_accessed_at` columns to `episodes`, `reflections`, `skills`. The `_memory_decay_loop` task in `daemon/main.py` periodically calls `store.prune_decayed(threshold=0.1, half_life_days=90)` using exponential decay. `touch_memory()` resets the score on recall — memory consumers (episodic recall, reflection queries) should call it after successful lookups.
@@ -72,11 +72,18 @@ Brain aliases: `kimi` is a canonical alias for `moonshot` (see `BRAIN_ALIASES` i
 
 ## Integrations (P5)
 
-See [`docs/architecture.md`](docs/architecture.md) for the full integration spec. Entry-points group `hyprland_agent.integrations`. Built-in: `mako`, `waybar`, `fuzzel`, `idle`, `voice`. `IntegrationRegistry` routes `ActionKind.notify` and `ActionKind.speak` to all registered integrations via `handle()`. `INTEGRATIONS_API_VERSION = "1.0"` — major-version mismatch causes the integration to be skipped.
+See [`docs/architecture.md`](docs/architecture.md) for the full integration spec. Entry-points group `hyprland_agent.integrations`. Built-in: `mako`, `waybar`, `fuzzel`, `idle`, `voice`. `IntegrationRegistry` routes `ActionKind.notify` and `ActionKind.speak` to all registered integrations via `handle()`. `INTEGRATIONS_API_VERSION = PROTOCOL_VERSION` — derived from `ipc.constants`; major-version mismatch causes the integration to be skipped.
 
 **Desktop launcher**: `packaging/desktop/hyprland-agent-tui.desktop` ships via the AUR package (`/usr/share/applications/`). Exec: `foot --app-id=hyprland-agent-tui agent tui`. Requires `foot` (declared as `optdepend` in PKGBUILD).
 
 **Console scripts:** `agent-waybar` → `cli/waybar_module.py:main`; `fuzzel-agent` → `cli/fuzzel_launcher.py:main`; `agent-voice` → `cli/voice_sidecar.py:main`. All three are thin async clients over the daemon socket.
+
+## Patterns to follow
+
+- **Config as source of truth**: `config.py` owns `KNOWN_PROVIDERS`, `PROVIDER_LABELS`; `paths.py` owns `CONFIG_DIR`, `CACHE_DIR`. Import from these, don't re-declare.
+- **Validate at boundary**: numeric config fields use `_clamp_int()` — fail fast at load time, not silently at use time.
+- **Derive, don't duplicate**: `INTEGRATIONS_API_VERSION = PROTOCOL_VERSION` instead of a second hardcoded copy.
+- **Dead code is deleted**: `SkillLibrary`, `EpisodicIngestor`, `skill_extraction_enabled` were removed rather than left to rot. Don't add config knobs without wiring them to a consumer.
 
 ## Known test state
 

@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-05-16
+
+### Added
+
+- Clipboard tool — `clipboard_read`/`clipboard_write` wired as `ActionKind` with
+  tool definitions in both `ClaudeBrain` and `OpenAICompatibleBrain`. Uses
+  native `wl-paste`/`wl-copy` subprocesses.
+- Reflection decay — `inject_context()` in `learning/api.py` now calls
+  `touch_memory("reflections", "run_id", …)` after fetching negative reflections,
+  so memory decay resets on every recall (G5).
+
+### Fixed
+
+- Dead code removed — `is_binary_allowed()`/`_DEFAULT_BINARY_ALLOWLIST` from
+  `safety/allowlist.py` (zero production callers); `SkillLibrary` from
+  `learning/skills.py`; `EpisodicIngestor` from `memory/ingest_consumer.py`;
+  `_disarm_killswitch` RPC handler and protocol enum value; `skill_extraction_enabled`
+  config field; 7 test files cleaned up.
+- Docs drift — `architecture.md` integration routing table now lists
+  `ActionKind.speak`; removed `clipboard.py` as separate tool module entry
+  (it's a single import, not an exposed module).
+- Test anti-pattern — `test_store_v4_migration.py` converted from sync
+  `asyncio.run()` inside fixtures to proper `async` fixture + `@pytest.mark.asyncio`
+  (G4).
+
+### Changed
+
+- Rate limiter `safety/rate_limit.py`: `threading.Lock` → `asyncio.Lock`,
+  all methods `async def` (L1). Callers and test stubs updated.
+- Brain API calls: `asyncio.wait_for(timeout=120.0)` wraps Claude and OpenAI
+  calls; OpenAI client uses explicit `httpx.Timeout(60.0, connect=10.0)` (H2).
+- `store.py`: `run_sync()`/`run_vec_sync()` made public (was `_run_sync`/`_run_vec_sync`)
+  with 30 s timeout (M2/L10).
+- `terminal.py`: `_DEFAULT_CAPTURE_CAP = 65536` (was 8192) — aligned to 64 KB
+  default from config (L9).
+- `openai_brain.py`: `json.JSONDecodeError` caught on malformed tool call
+  arguments (H1); `PROVIDERS` keys validated against `KNOWN_PROVIDERS` (D5).
+- `rule_runner.py`: `log.error()` → `log.exception()` with rule context (H3).
+
 ## [1.4.0] - 2026-05-16
 
 ### Added

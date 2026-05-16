@@ -92,13 +92,6 @@ async def _arm_killswitch(state: AppState, params: dict[str, Any]) -> dict[str, 
     return {"ok": True}
 
 
-async def _disarm_killswitch(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
-    from agent.safety import killswitch
-
-    killswitch.ensure_disarmed()
-    return {"ok": True}
-
-
 async def _record_feedback(state: AppState, params: dict[str, Any]) -> dict[str, Any]:
     run_id = params.get("run_id", "")
     kind = params.get("kind", "")
@@ -213,7 +206,6 @@ _DISPATCH: dict[RpcMethod, Handler] = {
     RpcMethod.screenshot: _screenshot,
     RpcMethod.reload_rules: _reload_rules,
     RpcMethod.arm_killswitch: _arm_killswitch,
-    RpcMethod.disarm_killswitch: _disarm_killswitch,
     RpcMethod.daemon_status: _daemon_status,
     RpcMethod.record_feedback: _record_feedback,
     RpcMethod.runs_analytics: _runs_analytics,

@@ -133,7 +133,7 @@ class EpisodicMemory:
             log.warning("Episode recall failed: %s", exc)
             return []
 
-        return [
+        episodes = [
             Episode(
                 run_id=r["run_id"],
                 task=r["task"],
@@ -144,3 +144,11 @@ class EpisodicMemory:
             )
             for r in rows
         ]
+
+        for ep in episodes:
+            try:
+                await self._store.touch_memory("episodes", "run_id", ep.run_id)
+            except Exception as exc:
+                log.debug("touch_memory failed for %s: %s", ep.run_id, exc)
+
+        return episodes

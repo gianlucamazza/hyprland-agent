@@ -7,28 +7,12 @@ import fnmatch
 import logging
 import shlex
 
+from agent.config import ENV_WHITELIST as _ENV_WHITELIST
 from agent.schemas import Event, Rule, RuleActionKind
 
 log = logging.getLogger(__name__)
 
 _ACTION_TIMEOUT = 30.0  # seconds per action
-
-# Strict environment passed to rule `run` actions — no credentials leaked.
-_ENV_WHITELIST = frozenset(
-    {
-        "PATH",
-        "HOME",
-        "USER",
-        "DISPLAY",
-        "WAYLAND_DISPLAY",
-        "XDG_RUNTIME_DIR",
-        "XDG_SESSION_TYPE",
-        "HYPRLAND_INSTANCE_SIGNATURE",
-        "DBUS_SESSION_BUS_ADDRESS",
-        "LANG",
-        "LC_ALL",
-    }
-)
 
 # First-token deny list — applies regardless of shell flag.
 _RUN_DENY = frozenset(
@@ -87,13 +71,21 @@ async def execute_rule(rule: Rule, event: Event) -> None:
             await asyncio.wait_for(_exec_action(action, event), timeout=_ACTION_TIMEOUT)
         except TimeoutError:
             log.warning(
-                "Rule action timed out after %.0fs: %s %s",
+                "Rule %s/%s timed out after %.0fs: %s %s",
+                rule.on.value,
+                rule.match.app_class or "*",
                 _ACTION_TIMEOUT,
                 action.kind,
                 action.value,
             )
-        except Exception as exc:
-            log.error("Rule action failed (%s %s): %s", action.kind, action.value, exc)
+        except Exception:
+            log.exception(
+                "Rule %s/%s action %s %s failed",
+                rule.on.value,
+                rule.match.app_class or "*",
+                action.kind,
+                action.value,
+            )
 
 
 async def _exec_action(action, event: Event) -> None:

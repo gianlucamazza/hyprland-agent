@@ -92,6 +92,8 @@ class ActionKind(StrEnum):
     notify = "notify"
     update_status = "update_status"
     speak = "speak"
+    clipboard_read = "clipboard_read"
+    clipboard_write = "clipboard_write"
 
 
 class Action(BaseModel):

@@ -34,22 +34,22 @@ agent run "<task>"
 
 | Module | Role |
 |--------|------|
-| `src/agent/ipc/` | Shared NDJSON wire protocol — Pydantic discriminated union, 1 MiB frame cap, protocol v1.0 |
+| `src/agent/ipc/` | Shared NDJSON wire protocol — Pydantic discriminated union, 1 MiB frame cap, protocol v1.0, `SOCKET_PATH` |
 | `src/agent/daemon/` | `server.py` RPC dispatch, `run_executor.py` queue + timeout, `watcher_service.py` Hyprland event fan-out, `pubsub.py` internal topic bus, `store.py` SQLite RunStore (schema v5), `rule_runner.py` watcher rules, `audit_log.py` run audit trail, `log_publisher.py` structured log distribution |
 | `src/agent/client/` | Async RPC client; used by CLI and TUI |
 | `src/agent/brain/` | LLM providers + `router.py` + Anthropic SDK client (`anthropic_client.py`); `context.py` assembles `BrainContext` injected into every LLM call |
-| `src/agent/tools/` | Hyprland native IPC (not `hyprctl`), screen capture, keyboard (`wtype`), mouse (`ydotool`), clipboard, events |
+| `src/agent/tools/` | Hyprland native IPC (not `hyprctl`), screen capture, keyboard (`wtype`), mouse (`ydotool`), clipboard (`wl-copy`/`wl-paste`), events, filesystem I/O |
 | `src/agent/safety/` | `allowlist.py` deny-by-default + miss counter, `confirm.py` gate, `killswitch.py` STOP flag (edge-triggered), `rate_limit.py` per-action-type rate limiter + command sanitizer |
 | `src/agent/tui/` | Textual monitoring TUI; `widgets/learning_pane.py` is the Ctrl+I Learning Inbox |
 | `src/agent/schemas.py` | All Pydantic models: `Action`, `ScreenState`, `RunSummary`, `ActionResult`, … |
 | `src/agent/awareness/` | `WorkingMemory` (per-run action log), `WorldSnapshot` (active windows + focused), `meta_cognition.py` (loop detection + post-action visual verify) |
 | `src/agent/introspection/` | `SelfModel` — capabilities, constraints, version string exposed to the brain |
 | `src/agent/memory/` | `FastEmbedder` (intfloat/multilingual-e5-large, lazy ONNX singleton), `EpisodicMemory` (ingest + cosine recall) |
-| `src/agent/learning/` | `LearningConsumer`, `ReflectionEngine`, `SkillLibrary`, `RuleMiner`, `AllowlistMiner`, `api.py` (proposals CRUD + approval side-effects), `outcome.py` (feedback→outcome derivation) |
+| `src/agent/learning/` | `LearningConsumer`, `ReflectionEngine`, `RuleMiner`, `AllowlistMiner`, `api.py` (proposals CRUD + approval side-effects), `outcome.py` (feedback→outcome derivation) |
 | `src/agent/integrations/` | `IntegrationRegistry`, `CapabilitySpec`, built-in Mako / Waybar / Fuzzel / Idle / Voice integrations |
 | `src/agent/voice/` | Voice I/O sidecar engines: Piper TTS, faster-whisper STT, openWakeWord, Silero VAD, ring buffer, redaction, audio pipeline |
 | `src/agent/diagnostics.py` | Health checks for `agent doctor` (binaries, sockets, credentials, connectivity) |
-| `src/agent/paths.py` | Shared path helpers (`CONFIG_DIR`, `CACHE_DIR`, `SOCKET_PATH`, …) |
+| `src/agent/paths.py` | Shared path helpers (`CONFIG_DIR`, `CACHE_DIR`, `runtime_dir()`, …) |
 
 ---
 
@@ -86,7 +86,7 @@ Three independent gates protect every action:
 ## SQLite schema versioning
 
 All migrations are applied in sequence by `_init_db` in `daemon/store.py`.
-`sqlite-vec` (vec0 extension) is loaded per-connection in `_run_vec_sync`.
+`sqlite-vec` (vec0 extension) is loaded per-connection in `run_vec_sync`.
 
 | Version | Tables added |
 |---------|-------------|
@@ -121,8 +121,8 @@ The orchestrator enriches every `BrainContext` via `learning/api.inject_context(
    returns `[]` if the model has not been downloaded yet.
 2. **Negative reflections** (`learning/reflection.py`): rule-based lessons from
    failed / stuck / errored runs, stored in `reflections` table.
-3. **Skill suggestions** (`learning/skills.py`): approved skills ranked by task
-   similarity, surfaced once approved via `agent learning approve skill <id>`.
+3. **Approved skills**: surfaced via `agent learning approve skill <id>` / `agent learning list skill`.
+   Skill extraction (`SkillLibrary`) was removed as dead code; skills must be added manually through the learning inbox.
 
 `LearningConsumer` is a single asyncio.Task subscribing to `Topic.runs`. On
 every `run_finished` event it dispatches to `EpisodicMemory.ingest()` and
@@ -147,9 +147,9 @@ Third-party packages register integrations via the entry-points group
 | `integrations/voice.py` | `VoiceIntegration` | Wires `ActionKind.speak`, publishes `Topic.voice` state |
 
 `IntegrationRegistry` discovers integrations at daemon startup, calls `setup()`,
-and routes `ActionKind.notify` / `ActionKind.update_status` to all registered
-handlers. Schema version `INTEGRATIONS_API_VERSION = "1.0"` — major-version
-mismatch causes the integration to be skipped.
+and routes `ActionKind.notify` / `ActionKind.update_status` / `ActionKind.speak` to all registered
+handlers. Schema version `INTEGRATIONS_API_VERSION = PROTOCOL_VERSION` (derived from `ipc.constants`)
+— major-version mismatch causes the integration to be skipped.
 
 Console scripts: `agent-waybar` (`cli/waybar_module.py`), `fuzzel-agent`
 (`cli/fuzzel_launcher.py`), and `agent-voice` (`cli/voice_sidecar.py`) are thin

@@ -16,24 +16,6 @@ _CONFIG_PATH = CONFIG_DIR / "allowlist.yaml"
 # Classes always blocked regardless of allowlist
 _ALWAYS_DENY = {"1password", "_1password", "keepassxc", "gnome-keyring"}
 
-# Binaries permitted for integration subprocesses when no yaml override exists
-_DEFAULT_BINARY_ALLOWLIST: frozenset[str] = frozenset(
-    {
-        "notify-send",
-        "makoctl",
-        "fuzzel",
-        "wl-copy",
-        "wl-paste",
-        "grim",
-        "slurp",
-        "hyprctl",
-        "wtype",
-        "ydotool",
-        "loginctl",
-        "foot",
-    }
-)
-
 # Thread-safe miss counter for AllowlistMiner to drain periodically
 _miss_counter: Counter[tuple[str, str]] = Counter()
 _miss_lock = threading.Lock()
@@ -78,22 +60,6 @@ def is_allowed(window: Window) -> bool:
     with _miss_lock:
         _miss_counter[(window.app_class, window.title)] += 1
     return False
-
-
-def is_binary_allowed(name: str) -> bool:
-    """Return True if *name* is in the binary allowlist.
-
-    Reads the optional ``binaries:`` list from allowlist.yaml.  Falls back to
-    _DEFAULT_BINARY_ALLOWLIST when the key is absent or the file does not exist.
-    """
-    if not _CONFIG_PATH.exists():
-        return name in _DEFAULT_BINARY_ALLOWLIST
-    with open(_CONFIG_PATH) as f:
-        data = yaml.safe_load(f) or {}
-    configured = data.get("binaries")
-    if configured is None:
-        return name in _DEFAULT_BINARY_ALLOWLIST
-    return name in frozenset(configured)
 
 
 def create_default_config() -> None:

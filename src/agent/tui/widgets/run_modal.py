@@ -15,16 +15,6 @@ from agent.ipc.protocol import RpcMethod
 if TYPE_CHECKING:
     from agent.tui.app import AgentApp
 
-_LABELS = {
-    "claude": "Claude",
-    "openai": "OpenAI",
-    "moonshot": "Kimi",
-    "groq": "Groq",
-    "together": "Together",
-    "zai": "Z.AI",
-    "qwen": "Qwen",
-}
-
 
 def _brain_options() -> list[tuple[str, str]]:
     try:
@@ -32,10 +22,13 @@ def _brain_options() -> list[tuple[str, str]]:
 
         providers = selectable_providers()
     except Exception:
-        from agent.config import KNOWN_PROVIDERS
+        from agent.config import KNOWN_PROVIDERS, PROVIDER_LABELS
 
         providers = list(KNOWN_PROVIDERS)
-    return [("Auto", "auto"), *[(_LABELS[p], p) for p in providers]]
+        return [("Auto", "auto"), *[(PROVIDER_LABELS[p], p) for p in providers]]
+    from agent.config import PROVIDER_LABELS
+
+    return [("Auto", "auto"), *[(PROVIDER_LABELS[p], p) for p in providers]]
 
 
 class RunModal(ModalScreen[str | None]):

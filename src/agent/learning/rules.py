@@ -28,7 +28,7 @@ class RuleMiner:
         """Mine rule candidates from recent successful runs. Returns proposals count."""
         cutoff = time.time() - window_days * 86400
         try:
-            return await self._store._run_sync(self._do_mine, cutoff)
+            return await self._store.run_sync(self._do_mine, cutoff)
         except Exception as exc:
             log.warning("Rule mining failed: %s", exc)
             return 0

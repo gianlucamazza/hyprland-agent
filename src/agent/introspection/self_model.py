@@ -6,12 +6,12 @@ import time
 from typing import Any
 
 from agent.config import CACHE_DIR, CONFIG_DIR, DEFAULT_MAX_ITER, DEFAULT_RUN_TIMEOUT
+from agent.safety.allowlist import _ALWAYS_DENY
 from agent.schemas import ActionKind
 
 _MAX_LOOP = DEFAULT_MAX_ITER
 _RUN_TIMEOUT = int(DEFAULT_RUN_TIMEOUT)
 _MAX_HOLD_S = 30
-_ALWAYS_DENY = {"1password", "_1password", "keepassxc", "gnome-keyring"}
 
 
 class SelfModel:

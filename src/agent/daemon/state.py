@@ -45,7 +45,7 @@ class AppState:
         from agent.daemon.watcher_service import load_rules
 
         self.rules = await load_rules()
-        if self.config.memory.enabled:
+        if self.config.memory.enabled and self.config.learning.enabled:
             lr = self.config.learning
             allowlist_miner = AllowlistMiner(self.store) if lr.allowlist_mining_enabled else None
             from agent.learning.rules import RuleMiner

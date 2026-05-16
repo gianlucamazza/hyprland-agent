@@ -211,7 +211,6 @@ def test_all_rpc_methods_have_values() -> None:
         "screenshot",
         "reload_rules",
         "arm_killswitch",
-        "disarm_killswitch",
         "daemon_status",
         "record_feedback",
         "runs_analytics",

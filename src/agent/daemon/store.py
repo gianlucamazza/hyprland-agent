@@ -76,7 +76,7 @@ class RunStore:
 
     async def open(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        await self._run_sync(self._init_db)
+        await self.run_sync(self._init_db)
 
     def _init_db(self, conn: sqlite3.Connection) -> None:
         # Load vec0 extension first so v3 virtual table can be created
@@ -225,7 +225,7 @@ class RunStore:
 
     async def insert_run(self, run: RunSummary) -> None:
         async with self._lock:
-            await self._run_sync(self._do_insert_run, run)
+            await self.run_sync(self._do_insert_run, run)
 
     def _do_insert_run(self, conn: sqlite3.Connection, run: RunSummary) -> None:
         conn.execute(
@@ -252,7 +252,7 @@ class RunStore:
     ) -> None:
         async with self._lock:
             ended = ended_at if ended_at is not None else time.time()
-            await self._run_sync(self._do_update_status, run_id, status.value, ended, error)
+            await self.run_sync(self._do_update_status, run_id, status.value, ended, error)
             self._lru.pop(run_id, None)  # invalidate cache entry
 
     def _do_update_status(
@@ -271,7 +271,7 @@ class RunStore:
 
     async def append_event(self, run_id: str, event: RunEventRecord) -> None:
         async with self._lock:
-            await self._run_sync(self._do_append_event, run_id, event)
+            await self.run_sync(self._do_append_event, run_id, event)
             self._lru.pop(run_id, None)  # invalidate so next get_run reads fresh
 
     def _do_append_event(
@@ -303,7 +303,7 @@ class RunStore:
         if iterations is None and action_count is None and duration_s is None:
             return
         async with self._lock:
-            await self._run_sync(
+            await self.run_sync(
                 self._do_update_metrics, run_id, iterations, action_count, duration_s
             )
             self._lru.pop(run_id, None)
@@ -340,7 +340,7 @@ class RunStore:
         rationale: str | None = None,
     ) -> None:
         async with self._lock:
-            await self._run_sync(self._do_upsert_outcome, run_id, outcome, score, source, rationale)
+            await self.run_sync(self._do_upsert_outcome, run_id, outcome, score, source, rationale)
 
     def _do_upsert_outcome(
         self,
@@ -369,7 +369,7 @@ class RunStore:
         comment: str | None = None,
     ) -> int:
         async with self._lock:
-            return await self._run_sync(self._do_insert_feedback, run_id, kind, comment)
+            return await self.run_sync(self._do_insert_feedback, run_id, kind, comment)
 
     def _do_insert_feedback(
         self,
@@ -389,7 +389,7 @@ class RunStore:
         import time as _time
 
         cutoff = _time.time() - days * 86400
-        return await self._run_sync(self._do_analytics, cutoff, days)
+        return await self.run_sync(self._do_analytics, cutoff, days)
 
     def _do_analytics(self, conn: sqlite3.Connection, cutoff: float, days: int) -> dict:
         conn.row_factory = sqlite3.Row
@@ -426,7 +426,7 @@ class RunStore:
     # ------------------------------------------------------------------
 
     async def list_runs(self, limit: int = 50) -> list[RunSummary]:
-        rows = await self._run_sync(self._do_list_runs, limit)
+        rows = await self.run_sync(self._do_list_runs, limit)
         return [self._row_to_summary(r) for r in rows]
 
     def _do_list_runs(self, conn: sqlite3.Connection, limit: int) -> list[sqlite3.Row]:
@@ -441,7 +441,7 @@ class RunStore:
         if run_id in self._lru:
             self._lru.move_to_end(run_id)
             return self._lru[run_id]
-        row_data = await self._run_sync(self._do_get_run, run_id)
+        row_data = await self.run_sync(self._do_get_run, run_id)
         if row_data is None:
             return None
         summary_row, event_rows = row_data
@@ -513,7 +513,7 @@ class RunStore:
         actions_json: str,
     ) -> None:
         async with self._lock:
-            await self._run_sync(
+            await self.run_sync(
                 self._do_insert_episode,
                 run_id,
                 task,
@@ -555,7 +555,7 @@ class RunStore:
         if not self._vec_ok:
             return
         async with self._lock:
-            await self._run_vec_sync(self._do_insert_episode_vec, run_id, embedding)
+            await self.run_vec_sync(self._do_insert_episode_vec, run_id, embedding)
 
     def _do_insert_episode_vec(
         self,
@@ -580,7 +580,7 @@ class RunStore:
     ) -> list[dict]:
         if not self._vec_ok:
             return []
-        return await self._run_vec_sync(
+        return await self.run_vec_sync(
             self._do_query_episodes_by_vec, embedding, k, exclude_outcome
         )
 
@@ -613,7 +613,7 @@ class RunStore:
     async def get_episode(self, run_id: str) -> dict | None:
         """Return a single episode row by run_id, or None if not found."""
         async with self._lock:
-            return await self._run_sync(self._do_get_episode, run_id)
+            return await self.run_sync(self._do_get_episode, run_id)
 
     def _do_get_episode(self, conn: sqlite3.Connection, run_id: str) -> dict | None:
         conn.row_factory = sqlite3.Row
@@ -632,7 +632,7 @@ class RunStore:
         generated_by: str,
     ) -> None:
         async with self._lock:
-            await self._run_sync(self._do_insert_reflection, run_id, polarity, text, generated_by)
+            await self.run_sync(self._do_insert_reflection, run_id, polarity, text, generated_by)
 
     def _do_insert_reflection(
         self,
@@ -652,7 +652,7 @@ class RunStore:
     async def list_recent_reflections(
         self, polarity: str = "negative", limit: int = 20
     ) -> list[dict]:
-        return await self._run_sync(self._do_list_recent_reflections, polarity, limit)
+        return await self.run_sync(self._do_list_recent_reflections, polarity, limit)
 
     def _do_list_recent_reflections(
         self,
@@ -725,18 +725,32 @@ class RunStore:
         conn.commit()
 
     def _apply_v5_migration(self, conn: sqlite3.Connection) -> None:
-        """Add decay_score and last_accessed_at columns for memory decay."""
+        """Add decay_score and last_accessed_at columns for memory decay.
+
+        Note: ``ALTER TABLE ADD COLUMN`` does not accept non-deterministic
+        ``DEFAULT`` expressions (e.g. ``strftime``).  We add the column without
+        a default and backfill existing rows with the current timestamp.
+        """
+        now = time.time()
         for table in ("episodes", "reflections"):
             cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
             if "decay_score" not in cols:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN decay_score REAL DEFAULT 1.0")
             if "last_accessed_at" not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN last_accessed_at REAL")
                 conn.execute(
-                    f"ALTER TABLE {table} ADD COLUMN last_accessed_at REAL DEFAULT (strftime('%s','now'))"
+                    f"UPDATE {table} SET last_accessed_at=? WHERE last_accessed_at IS NULL",
+                    (now,),
                 )
         cols = {row[1] for row in conn.execute("PRAGMA table_info(skills)").fetchall()}
         if "decay_score" not in cols:
             conn.execute("ALTER TABLE skills ADD COLUMN decay_score REAL DEFAULT 1.0")
+        if "last_accessed_at" not in cols:
+            conn.execute("ALTER TABLE skills ADD COLUMN last_accessed_at REAL")
+            conn.execute(
+                "UPDATE skills SET last_accessed_at=? WHERE last_accessed_at IS NULL",
+                (now,),
+            )
         conn.execute("PRAGMA user_version=5")
         conn.commit()
 
@@ -758,7 +772,7 @@ class RunStore:
 
         Returns a dict of ``{table: deleted_count}``.
         """
-        return await self._run_sync(self._do_prune_decayed, threshold, half_life_days)
+        return await self.run_sync(self._do_prune_decayed, threshold, half_life_days)
 
     def _do_prune_decayed(
         self,
@@ -790,7 +804,7 @@ class RunStore:
 
     async def touch_memory(self, table: str, row_id_col: str, row_id: str) -> None:
         """Update ``last_accessed_at`` for a memory row to prevent decay."""
-        await self._run_sync(
+        await self.run_sync(
             lambda conn: conn.execute(
                 f"UPDATE {table} SET last_accessed_at=strftime('%s','now'), decay_score=1.0 WHERE {row_id_col}=?",
                 (row_id,),
@@ -810,7 +824,7 @@ class RunStore:
         source_run_id: str | None = None,
     ) -> None:
         async with self._lock:
-            await self._run_sync(
+            await self.run_sync(
                 self._do_insert_skill,
                 skill_id,
                 name,
@@ -840,7 +854,7 @@ class RunStore:
         if not self._vec_ok:
             return
         async with self._lock:
-            await self._run_vec_sync(self._do_insert_skill_vec, skill_id, embedding)
+            await self.run_vec_sync(self._do_insert_skill_vec, skill_id, embedding)
 
     def _do_insert_skill_vec(
         self, conn: sqlite3.Connection, skill_id: str, embedding: list[float]
@@ -856,7 +870,7 @@ class RunStore:
 
     async def update_skill_status(self, skill_id: str, status: str) -> None:
         async with self._lock:
-            await self._run_sync(self._do_update_skill_status, skill_id, status)
+            await self.run_sync(self._do_update_skill_status, skill_id, status)
 
     def _do_update_skill_status(self, conn: sqlite3.Connection, skill_id: str, status: str) -> None:
         conn.execute("UPDATE skills SET status=? WHERE skill_id=?", (status, skill_id))
@@ -864,7 +878,7 @@ class RunStore:
 
     async def record_skill_outcome(self, skill_id: str, run_id: str, outcome: str) -> None:
         async with self._lock:
-            await self._run_sync(self._do_record_skill_outcome, skill_id, run_id, outcome)
+            await self.run_sync(self._do_record_skill_outcome, skill_id, run_id, outcome)
 
     def _do_record_skill_outcome(
         self, conn: sqlite3.Connection, skill_id: str, run_id: str, outcome: str
@@ -876,7 +890,7 @@ class RunStore:
         conn.commit()
 
     async def list_skills(self, status: str | None = None, limit: int = 50) -> list[dict]:
-        return await self._run_sync(self._do_list_skills, status, limit)
+        return await self.run_sync(self._do_list_skills, status, limit)
 
     def _do_list_skills(
         self, conn: sqlite3.Connection, status: str | None, limit: int
@@ -898,7 +912,7 @@ class RunStore:
     ) -> list[dict]:
         if not self._vec_ok:
             return []
-        return await self._run_vec_sync(self._do_query_skills_by_vec, embedding, k, status)
+        return await self.run_vec_sync(self._do_query_skills_by_vec, embedding, k, status)
 
     def _do_query_skills_by_vec(
         self, conn: sqlite3.Connection, embedding: list[float], k: int, status: str
@@ -925,7 +939,7 @@ class RunStore:
         self, rule_id: str, yaml_str: str, confidence: float, source_runs: str
     ) -> None:
         async with self._lock:
-            await self._run_sync(
+            await self.run_sync(
                 self._do_insert_learned_rule, rule_id, yaml_str, confidence, source_runs
             )
 
@@ -946,7 +960,7 @@ class RunStore:
         conn.commit()
 
     async def list_learned_rules(self, status: str | None = None) -> list[dict]:
-        return await self._run_sync(self._do_list_learned_rules, status)
+        return await self.run_sync(self._do_list_learned_rules, status)
 
     def _do_list_learned_rules(self, conn: sqlite3.Connection, status: str | None) -> list[dict]:
         conn.row_factory = sqlite3.Row
@@ -961,7 +975,7 @@ class RunStore:
 
     async def update_learned_rule_status(self, rule_id: str, status: str) -> None:
         async with self._lock:
-            await self._run_sync(self._do_update_rule_status, rule_id, status)
+            await self.run_sync(self._do_update_rule_status, rule_id, status)
 
     def _do_update_rule_status(self, conn: sqlite3.Connection, rule_id: str, status: str) -> None:
         conn.execute(
@@ -976,7 +990,7 @@ class RunStore:
 
     async def upsert_allowlist_proposal(self, app_class: str, title_pat: str) -> None:
         async with self._lock:
-            await self._run_sync(self._do_upsert_allowlist_proposal, app_class, title_pat)
+            await self.run_sync(self._do_upsert_allowlist_proposal, app_class, title_pat)
 
     def _do_upsert_allowlist_proposal(
         self, conn: sqlite3.Connection, app_class: str, title_pat: str
@@ -993,7 +1007,7 @@ class RunStore:
         conn.commit()
 
     async def list_allowlist_proposals(self, status: str | None = "pending") -> list[dict]:
-        return await self._run_sync(self._do_list_allowlist_proposals, status)
+        return await self.run_sync(self._do_list_allowlist_proposals, status)
 
     def _do_list_allowlist_proposals(
         self, conn: sqlite3.Connection, status: str | None
@@ -1012,7 +1026,7 @@ class RunStore:
 
     async def update_allowlist_proposal_status(self, proposal_id: int, status: str) -> None:
         async with self._lock:
-            await self._run_sync(self._do_update_allowlist_proposal_status, proposal_id, status)
+            await self.run_sync(self._do_update_allowlist_proposal_status, proposal_id, status)
 
     def _do_update_allowlist_proposal_status(
         self, conn: sqlite3.Connection, proposal_id: int, status: str
@@ -1027,8 +1041,8 @@ class RunStore:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _run_sync(self, fn, *args):
-        """Execute *fn(conn, *args)* in a thread executor."""
+    async def run_sync(self, fn, *args, timeout: float = 30.0):
+        """Execute *fn(conn, *args)* in a thread executor with a timeout."""
         path = str(self._path)
 
         def _call():
@@ -1036,10 +1050,10 @@ class RunStore:
                 return fn(conn, *args)
 
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, _call)
+        return await asyncio.wait_for(loop.run_in_executor(None, _call), timeout=timeout)
 
-    async def _run_vec_sync(self, fn, *args):
-        """Like _run_sync but loads vec0 extension before calling *fn*."""
+    async def run_vec_sync(self, fn, *args, timeout: float = 30.0):
+        """Like run_sync but loads vec0 extension before calling *fn*."""
         path = str(self._path)
 
         def _call():
@@ -1048,4 +1062,4 @@ class RunStore:
                 return fn(conn, *args)
 
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, _call)
+        return await asyncio.wait_for(loop.run_in_executor(None, _call), timeout=timeout)

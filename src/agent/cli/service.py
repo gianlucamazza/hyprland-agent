@@ -109,12 +109,13 @@ def cmd_uninstall(
     """Remove config, cache, and systemd unit (keeps ~/.cache/fastembed)."""
     import shutil
     import subprocess
-    from pathlib import Path
+
+    from agent.paths import CACHE_DIR, CONFIG_DIR, SYSTEMD_USER_DIR
 
     targets = [
-        Path.home() / ".config" / "hyprland-agent",
-        Path.home() / ".cache" / "hyprland-agent",
-        Path.home() / ".config" / "systemd" / "user" / "hyprland-agent.service",
+        CONFIG_DIR,
+        CACHE_DIR,
+        SYSTEMD_USER_DIR / "hyprland-agent.service",
     ]
     existing = [t for t in targets if t.exists()]
     if not existing:

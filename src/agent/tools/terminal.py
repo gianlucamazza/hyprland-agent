@@ -11,7 +11,7 @@ EmitFn = Callable[[str, dict], Awaitable[None]]
 
 _DEFAULT_TIMEOUT = 300.0
 _MAX_HOLD_S = 30.0
-_DEFAULT_CAPTURE_CAP = 8192  # bytes kept from stdout/stderr tail
+_DEFAULT_CAPTURE_CAP = 65536  # bytes kept from stdout/stderr tail (64 KB)
 
 
 async def run_command(

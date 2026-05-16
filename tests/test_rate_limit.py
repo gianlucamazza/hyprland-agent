@@ -5,66 +5,76 @@ from __future__ import annotations
 import time
 from collections import deque
 
+import pytest
+
 from agent.safety.rate_limit import RateLimiter, sanitize_command
 
 # ── RateLimiter ────────────────────────────────────────────────────────────────
 
 
 class TestRateLimiter:
-    def test_allows_first_action(self) -> None:
+    @pytest.mark.asyncio
+    async def test_allows_first_action(self) -> None:
         limiter = RateLimiter()
-        assert limiter.check("type_text") is True
+        assert await limiter.check("type_text") is True
 
-    def test_blocks_when_exceeded(self) -> None:
+    @pytest.mark.asyncio
+    async def test_blocks_when_exceeded(self) -> None:
         limiter = RateLimiter(limits={"test_kind": (2, 60)})
-        assert limiter.check("test_kind") is True
-        assert limiter.check("test_kind") is True
-        assert limiter.check("test_kind") is False
+        assert await limiter.check("test_kind") is True
+        assert await limiter.check("test_kind") is True
+        assert await limiter.check("test_kind") is False
 
-    def test_allows_after_window_expiry(self) -> None:
+    @pytest.mark.asyncio
+    async def test_allows_after_window_expiry(self) -> None:
         limiter = RateLimiter(limits={"fast": (1, 0.05)})
-        assert limiter.check("fast") is True
-        assert limiter.check("fast") is False
+        assert await limiter.check("fast") is True
+        assert await limiter.check("fast") is False
         time.sleep(0.06)
-        assert limiter.check("fast") is True
+        assert await limiter.check("fast") is True
 
-    def test_fallback_limit(self) -> None:
+    @pytest.mark.asyncio
+    async def test_fallback_limit(self) -> None:
         limiter = RateLimiter(limits={})
         for _ in range(60):
-            assert limiter.check("unknown_kind") is True
-        assert limiter.check("unknown_kind") is False
+            assert await limiter.check("unknown_kind") is True
+        assert await limiter.check("unknown_kind") is False
 
-    def test_different_kinds_independent(self) -> None:
+    @pytest.mark.asyncio
+    async def test_different_kinds_independent(self) -> None:
         limiter = RateLimiter(limits={"a": (1, 60), "b": (1, 60)})
-        assert limiter.check("a") is True
-        assert limiter.check("b") is True
-        assert limiter.check("a") is False
-        assert limiter.check("b") is False
+        assert await limiter.check("a") is True
+        assert await limiter.check("b") is True
+        assert await limiter.check("a") is False
+        assert await limiter.check("b") is False
 
-    def test_reset_clears_buckets(self) -> None:
+    @pytest.mark.asyncio
+    async def test_reset_clears_buckets(self) -> None:
         limiter = RateLimiter(limits={"x": (1, 60)})
-        assert limiter.check("x") is True
-        assert limiter.check("x") is False
-        limiter.reset()
-        assert limiter.check("x") is True
+        assert await limiter.check("x") is True
+        assert await limiter.check("x") is False
+        await limiter.reset()
+        assert await limiter.check("x") is True
 
-    def test_reconfigure_replaces_limits_and_clears(self) -> None:
+    @pytest.mark.asyncio
+    async def test_reconfigure_replaces_limits_and_clears(self) -> None:
         from agent.config import RateLimitConfig
 
         limiter = RateLimiter(limits={"a": (1, 60)})
-        assert limiter.check("a") is True
-        assert limiter.check("a") is False
+        assert await limiter.check("a") is True
+        assert await limiter.check("a") is False
 
         cfg = RateLimitConfig(
             gui_actions_per_minute=99, terminal_commands_per_minute=99, other_actions_per_minute=99
         )
-        limiter.reconfigure(cfg)
+        await limiter.reconfigure(cfg)
         # "a" is not in GUI or terminal kinds, so it uses the new "other" limit
         for _ in range(99):
-            assert limiter.check("a") is True
-        assert limiter.check("a") is False
+            assert await limiter.check("a") is True
+        assert await limiter.check("a") is False
 
-    def test_from_config_creates_limiter(self) -> None:
+    @pytest.mark.asyncio
+    async def test_from_config_creates_limiter(self) -> None:
         from agent.config import RateLimitConfig
 
         cfg = RateLimitConfig(
@@ -73,43 +83,51 @@ class TestRateLimiter:
         limiter = RateLimiter.from_config(cfg)
         # type_text is a GUI kind, limit 5/min
         for _ in range(5):
-            assert limiter.check("type_text") is True
-        assert limiter.check("type_text") is False
+            assert await limiter.check("type_text") is True
+        assert await limiter.check("type_text") is False
         # unknown kind uses "other" limit (3/min)
-        limiter.reset()
+        await limiter.reset()
         for _ in range(3):
-            assert limiter.check("other_kind") is True
-        assert limiter.check("other_kind") is False
+            assert await limiter.check("other_kind") is True
+        assert await limiter.check("other_kind") is False
 
-    def test_from_config_none_uses_defaults(self) -> None:
+    @pytest.mark.asyncio
+    async def test_from_config_none_uses_defaults(self) -> None:
         limiter = RateLimiter.from_config(None)
-        assert limiter.check("type_text") is True
+        assert await limiter.check("type_text") is True
 
     def test_thread_safety(self) -> None:
         import concurrent.futures
 
         limiter = RateLimiter(limits={"shared": (1000, 60)})
 
-        def _check() -> bool:
-            return limiter.check("shared")
+        async def _check() -> bool:
+            return await limiter.check("shared")
+
+        def _run() -> bool:
+            import asyncio
+
+            return asyncio.run(_check())
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-            results = list(pool.map(lambda _: _check(), range(100)))
+            results = list(pool.map(lambda _: _run(), range(100)))
         assert sum(results) == 100  # all should pass within limit
 
-    def test_internal_buckets_are_deques(self) -> None:
+    @pytest.mark.asyncio
+    async def test_internal_buckets_are_deques(self) -> None:
         limiter = RateLimiter()
-        limiter.check("x")
+        await limiter.check("x")
         assert isinstance(limiter._buckets["x"], deque)  # noqa: SLF001
 
-    def test_reconfigure_after_use_does_not_raise(self) -> None:
+    @pytest.mark.asyncio
+    async def test_reconfigure_after_use_does_not_raise(self) -> None:
         from agent.config import RateLimitConfig
 
         limiter = RateLimiter()
-        limiter.check("type_text")
+        await limiter.check("type_text")
         cfg = RateLimitConfig()
-        limiter.reconfigure(cfg)
-        assert limiter.check("type_text") is True
+        await limiter.reconfigure(cfg)
+        assert await limiter.check("type_text") is True
 
 
 # ── sanitize_command ──────────────────────────────────────────────────────────

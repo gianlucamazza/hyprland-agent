@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from typing import TYPE_CHECKING, Any
 
@@ -14,6 +15,8 @@ from agent.tools import hypr, screen
 
 if TYPE_CHECKING:
     from agent.brain.context import BrainContext
+
+log = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "claude-opus-4-7"
 _MAX_TOKENS = 4096
@@ -118,6 +121,22 @@ _CUSTOM_TOOLS: list[dict[str, Any]] = [
             "required": ["path"],
         },
     },
+    {
+        "name": "clipboard_read",
+        "description": "Read text from the system clipboard (wl-paste).",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "clipboard_write",
+        "description": "Write text to the system clipboard (wl-copy).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to copy to clipboard"},
+            },
+            "required": ["text"],
+        },
+    },
 ]
 
 
@@ -159,6 +178,12 @@ async def _handle_custom(name: str, inp: dict[str, Any]) -> tuple[str, list[Acti
         return "Writing file...", [Action(kind=ActionKind.write_file, params=inp)]
     if name == "list_dir":
         return "Listing directory...", [Action(kind=ActionKind.list_dir, params=inp)]
+    if name == "clipboard_read":
+        return "Reading clipboard...", [Action(kind=ActionKind.clipboard_read)]
+    if name == "clipboard_write":
+        return "Writing clipboard...", [
+            Action(kind=ActionKind.clipboard_write, params={"text": inp["text"]})
+        ]
     return "unknown tool", []
 
 
@@ -217,23 +242,24 @@ class ClaudeBrain:
         tools = [_computer_tool(scaled_w, scaled_h)] + _CUSTOM_TOOLS
         all_actions: list[Action] = []
 
-        from agent.config import load_config as _load_cfg
-
-        ctx_cfg = _load_cfg().context
+        ctx_cfg = ctx.context_config
 
         for _iteration in range(_MAX_LOOP):
             messages = compact_messages(
                 messages,
-                budget_tokens=ctx_cfg.budget_tokens,
-                keep_rounds=ctx_cfg.keep_rounds,
+                budget_tokens=ctx_cfg.budget_tokens if ctx_cfg else 160_000,
+                keep_rounds=ctx_cfg.keep_rounds if ctx_cfg else 3,
             )
-            response = await asyncio.to_thread(
-                client.messages.create,
-                model=self.model,
-                max_tokens=self.max_tokens,
-                system=system_prompt,
-                tools=tools,
-                messages=messages,
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.messages.create,
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    system=system_prompt,
+                    tools=tools,
+                    messages=messages,
+                ),
+                timeout=120.0,
             )
             tool_results = []
             for block in response.content:

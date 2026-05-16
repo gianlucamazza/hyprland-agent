@@ -6,21 +6,26 @@ Built-in: OpenAI, Moonshot Kimi, Groq, Together AI, Z.AI, Qwen (DashScope).
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from openai import AsyncOpenAI
 
 from agent.brain._action_map import computer_actions
 from agent.brain._common import MAX_LOOP, SCALE, compact_messages, png_b64
+from agent.config import KNOWN_PROVIDERS
 from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
 
 if TYPE_CHECKING:
     from agent.brain.context import BrainContext
 
+log = logging.getLogger(__name__)
 _SCALE = SCALE
 _MAX_LOOP = MAX_LOOP
 
@@ -68,6 +73,11 @@ PROVIDERS: dict[str, ProviderConfig] = {
         "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
     ),
 }
+
+# All PROVIDERS keys must be listed in KNOWN_PROVIDERS (source of truth in config.py).
+assert set(PROVIDERS).issubset(KNOWN_PROVIDERS), (
+    f"PROVIDERS keys {set(PROVIDERS)} must be subset of KNOWN_PROVIDERS {set(KNOWN_PROVIDERS)}"
+)
 
 
 def build_brain(provider_key: str) -> OpenAICompatibleBrain:
@@ -307,6 +317,28 @@ _TOOLS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "clipboard_read",
+            "description": "Read text from the system clipboard.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "clipboard_write",
+            "description": "Write text to the system clipboard.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "Text to copy to clipboard"},
+                },
+                "required": ["text"],
+            },
+        },
+    },
 ]
 
 
@@ -367,6 +399,13 @@ async def _call_tool(
     if name == "list_dir":
         return "Listing directory...", [Action(kind=ActionKind.list_dir, params=args)]
 
+    if name == "clipboard_read":
+        return "Reading clipboard...", [Action(kind=ActionKind.clipboard_read)]
+    if name == "clipboard_write":
+        return "Writing clipboard...", [
+            Action(kind=ActionKind.clipboard_write, params={"text": args["text"]})
+        ]
+
     return "unknown tool", []
 
 
@@ -374,7 +413,11 @@ class OpenAICompatibleBrain:
     def __init__(self, api_key: str, model: str, base_url: str | None = None):
         self._model = model
         self._scale = 1.0 / _SCALE
-        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        self._timeout = 120.0
+        client_kwargs: dict[str, Any] = {
+            "api_key": api_key,
+            "timeout": httpx.Timeout(60.0, connect=10.0),
+        }
         if base_url:
             client_kwargs["base_url"] = base_url
         self._client = AsyncOpenAI(**client_kwargs)
@@ -406,22 +449,23 @@ class OpenAICompatibleBrain:
         ]
         all_actions: list[Action] = []
 
-        from agent.config import load_config as _load_cfg
-
-        ctx_cfg = _load_cfg().context
+        ctx_cfg = ctx.context_config
 
         for _iteration in range(_MAX_LOOP):
             messages = compact_messages(
                 messages,
-                budget_tokens=ctx_cfg.budget_tokens,
-                keep_rounds=ctx_cfg.keep_rounds,
+                budget_tokens=ctx_cfg.budget_tokens if ctx_cfg else 160_000,
+                keep_rounds=ctx_cfg.keep_rounds if ctx_cfg else 3,
             )
-            response = await self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,
-                tools=_TOOLS,
-                tool_choice="auto",
-                max_completion_tokens=2048,
+            response = await asyncio.wait_for(
+                self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages,
+                    tools=_TOOLS,
+                    tool_choice="auto",
+                    max_completion_tokens=2048,
+                ),
+                timeout=self._timeout,
             )
             msg = response.choices[0].message
             messages.append(msg)
@@ -431,7 +475,16 @@ class OpenAICompatibleBrain:
 
             tool_results = []
             for tc in msg.tool_calls:
-                args = json.loads(tc.function.arguments)
+                try:
+                    args = json.loads(tc.function.arguments)
+                except json.JSONDecodeError as exc:
+                    log.warning(
+                        "Malformed JSON from %s tool call %s: %s",
+                        self._model,
+                        tc.function.name,
+                        exc,
+                    )
+                    continue
                 result_text, actions = await _call_tool(tc.function.name, args, scale=self._scale)
                 all_actions.extend(actions)
                 tool_results.append(

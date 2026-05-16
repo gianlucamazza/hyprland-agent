@@ -17,13 +17,15 @@ import shutil
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from agent.ipc.constants import PROTOCOL_VERSION
+
 if TYPE_CHECKING:
     from agent.daemon.state import AppState
     from agent.schemas import Action, ActionResult
 
 log = logging.getLogger(__name__)
 
-INTEGRATIONS_API_VERSION = "1.0"
+INTEGRATIONS_API_VERSION = PROTOCOL_VERSION
 _ENTRY_POINT_GROUP = "hyprland_agent.integrations"
 
 

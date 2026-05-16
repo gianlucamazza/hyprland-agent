@@ -164,7 +164,9 @@ def test_service_install_yes(tmp_path):
 
 
 def test_service_uninstall_nothing_to_remove(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr("agent.paths.CONFIG_DIR", tmp_path / ".config" / "hyprland-agent")
+    monkeypatch.setattr("agent.paths.CACHE_DIR", tmp_path / ".cache" / "hyprland-agent")
+    monkeypatch.setattr("agent.paths.SYSTEMD_USER_DIR", tmp_path / ".config" / "systemd" / "user")
     result = runner.invoke(app, ["service", "uninstall"])
     assert result.exit_code == 0
     assert "Nothing to remove" in result.output
@@ -177,7 +179,12 @@ def test_service_uninstall_removes_dirs(tmp_path):
     cache_dir = tmp_path / ".cache" / "hyprland-agent"
     cache_dir.mkdir(parents=True)
 
-    with patch("pathlib.Path.home", return_value=tmp_path), patch("subprocess.run"):
+    with (
+        patch("agent.paths.CONFIG_DIR", cfg_dir),
+        patch("agent.paths.CACHE_DIR", cache_dir),
+        patch("agent.paths.SYSTEMD_USER_DIR", tmp_path / ".config" / "systemd" / "user"),
+        patch("subprocess.run"),
+    ):
         result = runner.invoke(app, ["service", "uninstall", "--yes"])
 
     assert result.exit_code == 0

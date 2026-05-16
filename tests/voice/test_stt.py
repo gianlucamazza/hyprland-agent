@@ -83,8 +83,8 @@ async def test_faster_whisper_engine_model_name() -> None:
 
 
 def test_stt_engine_protocol() -> None:
-    from agent.voice.stt import FasterWhisperEngine
     from agent.voice.engines import SttEngine
+    from agent.voice.stt import FasterWhisperEngine
 
     assert isinstance(FasterWhisperEngine(model="tiny"), SttEngine)
 

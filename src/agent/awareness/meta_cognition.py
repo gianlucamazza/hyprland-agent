@@ -8,17 +8,19 @@ import logging
 from collections import deque
 from typing import TYPE_CHECKING
 
+from agent.schemas import ActionKind
+
 if TYPE_CHECKING:
-    from agent.schemas import Action, ActionKind, ActionResult
+    from agent.schemas import Action, ActionResult
 
 log = logging.getLogger(__name__)
 
 _VISUAL_KINDS = {
-    "mouse_move",
-    "click",
-    "scroll",
-    "focus_window",
-    "dispatch",
+    ActionKind.mouse_move.value,
+    ActionKind.click.value,
+    ActionKind.scroll.value,
+    ActionKind.focus_window.value,
+    ActionKind.dispatch.value,
 }
 
 

@@ -20,7 +20,6 @@ class RpcMethod(StrEnum):
     screenshot = "screenshot"
     reload_rules = "reload_rules"
     arm_killswitch = "arm_killswitch"
-    disarm_killswitch = "disarm_killswitch"
     daemon_status = "daemon_status"
     record_feedback = "record_feedback"
     runs_analytics = "runs_analytics"

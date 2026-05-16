@@ -169,7 +169,7 @@ async def test_run_executes_terminal_command_in_owned_terminal(
         emit=ANY,
         hold_s=3.0,
         visible=True,
-        capture_cap=8192,
+        capture_cap=65536,
         stdin=None,
     )
     assert [event[0] for event in events] == [
@@ -304,18 +304,18 @@ async def test_unsafe_terminal_command_blocked(
 class _ExhaustedLimiter:
     """Rate limiter stub that denies every check."""
 
-    def check(self, kind: str) -> bool:
+    async def check(self, kind: str) -> bool:
         return False
 
-    def reconfigure(self, cfg: Any) -> None:
+    async def reconfigure(self, cfg: Any) -> None:
         pass
 
 
 class _AlwaysAllowLimiter:
     """Rate limiter stub that allows every check."""
 
-    def check(self, kind: str) -> bool:
+    async def check(self, kind: str) -> bool:
         return True
 
-    def reconfigure(self, cfg: Any) -> None:
+    async def reconfigure(self, cfg: Any) -> None:
         pass

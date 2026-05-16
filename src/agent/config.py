@@ -8,12 +8,22 @@ from typing import Any
 
 import yaml
 
-CONFIG_DIR = Path.home() / ".config" / "hyprland-agent"
+from agent.paths import CACHE_DIR, CONFIG_DIR  # noqa: F401 — re-exported for downstream consumers
+
 CONFIG_PATH = CONFIG_DIR / "config.yaml"
-CACHE_DIR = Path.home() / ".cache" / "hyprland-agent"
 
 KNOWN_PROVIDERS = ("claude", "openai", "moonshot", "groq", "together", "zai", "qwen")
-DEFAULT_AUTO_ORDER = ("claude", "openai", "moonshot", "groq", "together", "zai", "qwen")
+DEFAULT_AUTO_ORDER = KNOWN_PROVIDERS
+
+PROVIDER_LABELS: dict[str, str] = {
+    "claude": "Claude",
+    "openai": "OpenAI",
+    "moonshot": "Kimi",
+    "groq": "Groq",
+    "together": "Together",
+    "zai": "Z.AI",
+    "qwen": "Qwen",
+}
 
 # Public alias map: user-facing name → canonical provider key.
 BRAIN_ALIASES: dict[str, str] = {
@@ -36,6 +46,23 @@ BRAIN_ALIASES: dict[str, str] = {
 # Default tunables — single source of truth; imported by brain and daemon modules.
 DEFAULT_MAX_ITER: int = 20  # max LLM tool-use iterations per run
 DEFAULT_RUN_TIMEOUT: float = 300.0  # seconds before a run is force-aborted
+
+# Env vars forwarded to integration/rule subprocesses — no credentials leaked.
+ENV_WHITELIST: frozenset[str] = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XDG_RUNTIME_DIR",
+        "XDG_SESSION_TYPE",
+        "HYPRLAND_INSTANCE_SIGNATURE",
+        "DBUS_SESSION_BUS_ADDRESS",
+        "LANG",
+        "LC_ALL",
+    }
+)
 
 
 class ConfigError(ValueError):
@@ -74,7 +101,6 @@ class DecayConfig:
 class LearningConfig:
     enabled: bool = True
     mining_interval_s: int = 300
-    skill_extraction_enabled: bool = True
     rule_mining_enabled: bool = True
     allowlist_mining_enabled: bool = True
     decay: DecayConfig = field(default_factory=DecayConfig)
@@ -180,13 +206,23 @@ def _brain_config(data: dict[str, Any]) -> BrainConfig:
     return BrainConfig(default=default, auto_order=auto_order, providers=enabled)
 
 
+def _clamp_int(raw: Any, key: str, default: int, lo: int, hi: int | None = None) -> int:
+    """Read *key* from *raw* (mapping), clamp to [lo, hi] and return."""
+    value = int(raw.get(key, default))
+    if value < lo:
+        raise ConfigError(f"{key} must be >= {lo}, got {value}")
+    if hi is not None and value > hi:
+        raise ConfigError(f"{key} must be <= {hi}, got {value}")
+    return value
+
+
 def _memory_config(data: dict[str, Any]) -> MemoryConfig:
     raw = data.get("memory", {}) or {}
     if not isinstance(raw, dict):
         raise ConfigError("memory must be a mapping")
     return MemoryConfig(
         enabled=bool(raw.get("enabled", True)),
-        recall_k=int(raw.get("recall_k", 3)),
+        recall_k=_clamp_int(raw, "recall_k", 3, 1),
         embedder_model=str(raw.get("embedder_model", "intfloat/multilingual-e5-large")),
         filter_failure_in_recall=bool(raw.get("filter_failure_in_recall", True)),
     )
@@ -196,11 +232,14 @@ def _decay_config(raw_parent: dict[str, Any]) -> DecayConfig:
     raw = raw_parent.get("decay", {}) or {}
     if not isinstance(raw, dict):
         raise ConfigError("learning.decay must be a mapping")
+    prune = float(raw.get("prune_threshold", 0.1))
+    if prune < 0.0 or prune > 1.0:
+        raise ConfigError(f"learning.decay.prune_threshold must be 0.0..1.0, got {prune}")
     return DecayConfig(
         enabled=bool(raw.get("enabled", True)),
-        half_life_days=int(raw.get("half_life_days", 90)),
-        prune_threshold=float(raw.get("prune_threshold", 0.1)),
-        cleanup_interval_s=int(raw.get("cleanup_interval_s", 3600)),
+        half_life_days=_clamp_int(raw, "half_life_days", 90, 1),
+        prune_threshold=prune,
+        cleanup_interval_s=_clamp_int(raw, "cleanup_interval_s", 3600, 1),
     )
 
 
@@ -210,8 +249,7 @@ def _learning_config(data: dict[str, Any]) -> LearningConfig:
         raise ConfigError("learning must be a mapping")
     return LearningConfig(
         enabled=bool(raw.get("enabled", True)),
-        mining_interval_s=int(raw.get("mining_interval_s", 300)),
-        skill_extraction_enabled=bool(raw.get("skill_extraction_enabled", True)),
+        mining_interval_s=_clamp_int(raw, "mining_interval_s", 300, 1),
         rule_mining_enabled=bool(raw.get("rule_mining_enabled", True)),
         allowlist_mining_enabled=bool(raw.get("allowlist_mining_enabled", True)),
         decay=_decay_config(raw),
@@ -223,9 +261,9 @@ def _rate_limit_config(data: dict[str, Any]) -> RateLimitConfig:
     if not isinstance(raw, dict):
         raise ConfigError("rate_limit must be a mapping")
     return RateLimitConfig(
-        gui_actions_per_minute=int(raw.get("gui_actions_per_minute", 30)),
-        terminal_commands_per_minute=int(raw.get("terminal_commands_per_minute", 10)),
-        other_actions_per_minute=int(raw.get("other_actions_per_minute", 60)),
+        gui_actions_per_minute=_clamp_int(raw, "gui_actions_per_minute", 30, 0),
+        terminal_commands_per_minute=_clamp_int(raw, "terminal_commands_per_minute", 10, 0),
+        other_actions_per_minute=_clamp_int(raw, "other_actions_per_minute", 60, 0),
     )
 
 
@@ -234,7 +272,7 @@ def _terminal_config(data: dict[str, Any]) -> TerminalConfig:
     if not isinstance(raw, dict):
         raise ConfigError("terminal must be a mapping")
     return TerminalConfig(
-        capture_cap_kb=int(raw.get("capture_cap_kb", 64)),
+        capture_cap_kb=_clamp_int(raw, "capture_cap_kb", 64, 1),
     )
 
 
@@ -275,8 +313,8 @@ def _context_config(data: dict[str, Any]) -> ContextConfig:
     if not isinstance(raw, dict):
         raise ConfigError("context must be a mapping")
     return ContextConfig(
-        budget_tokens=int(raw.get("budget_tokens", 160_000)),
-        keep_rounds=int(raw.get("keep_rounds", 3)),
+        budget_tokens=_clamp_int(raw, "budget_tokens", 160_000, 1),
+        keep_rounds=_clamp_int(raw, "keep_rounds", 3, 0),
     )
 
 

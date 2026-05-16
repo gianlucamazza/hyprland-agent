@@ -57,7 +57,7 @@ async def _make_run(store: RunStore, task: str, ctx_class: str, kinds: list[str]
         )
         conn.commit()
 
-    await store._run_sync(_set_context)
+    await store.run_sync(_set_context)
     return s.run_id
 
 

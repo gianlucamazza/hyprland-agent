@@ -13,6 +13,7 @@ from agent.awareness.world_context import snapshot as _world_snapshot
 from agent.brain.base import Brain
 from agent.brain.context import BrainContext
 from agent.introspection.self_model import SelfModel
+from agent.learning.api import inject_context as _inject_context
 from agent.safety import confirm, killswitch
 from agent.safety.allowlist import is_allowed
 from agent.safety.rate_limit import RateLimiter, sanitize_command
@@ -106,11 +107,11 @@ async def _execute_action(
 
     # --- Lazy-init rate limiter from config once ---
     if not _rate_limiter_configured and app_state is not None:
-        _rate_limiter.reconfigure(app_state.config.rate_limit)
+        await _rate_limiter.reconfigure(app_state.config.rate_limit)
         _rate_limiter_configured = True
 
     # --- Rate-limit gate ---
-    if not _rate_limiter.check(k.value):
+    if not await _rate_limiter.check(k.value):
         log.warning("Rate-limited action: %s", k.value)
         return ActionResult(kind=k.value, blocked="rate_limited")
 
@@ -128,7 +129,7 @@ async def _execute_action(
         run_id = ctx.run_id if ctx is not None else "local"
         visible = bool(p.get("visible", True))
         capture_cap = (
-            app_state.config.terminal.capture_cap_kb * 1024 if app_state is not None else 8192
+            app_state.config.terminal.capture_cap_kb * 1024 if app_state is not None else 65536
         )
         code, stdout, stderr, total_bytes = await terminal.run_command(
             p["command"],
@@ -220,6 +221,18 @@ async def _execute_action(
         except (NotADirectoryError, PermissionError, FileNotFoundError) as exc:
             return ActionResult(kind=k.value, blocked=str(exc))
 
+    if k == ActionKind.clipboard_read:
+        from agent.tools.clipboard import read as _clip_read
+
+        text = await _clip_read()
+        return ActionResult(kind=k.value, stdout=text)
+
+    if k == ActionKind.clipboard_write:
+        from agent.tools.clipboard import write as _clip_write
+
+        await _clip_write(p["text"])
+        return base
+
     if k in (ActionKind.notify, ActionKind.update_status, ActionKind.speak):
         if app_state is not None:
             result = await app_state.integrations.handle(action)
@@ -301,9 +314,9 @@ async def _assemble_brain_context(
     )
     if app_state is not None:
         world.integrations = app_state.integrations.status()
-        from agent.learning.api import inject_context
-
-        return await inject_context(app_state, task, self_model, world)
+        bctx = await _inject_context(app_state, task, self_model, world)
+        bctx.context_config = app_state.config.context
+        return bctx
     return BrainContext(self_model=self_model, world=world, working=WorkingMemory())
 
 
@@ -321,6 +334,11 @@ async def plan(
 
     state, allowed = await _build_state(task, ctx)
     if not allowed:
+        return
+
+    if killswitch.is_stopped():
+        log.warning("Kill switch triggered during plan")
+        await _emit("killswitch", {})
         return
 
     brain_ctx = await _assemble_brain_context(state, brain, task, app_state)
@@ -350,8 +368,21 @@ async def run(
     if not allowed:
         return
 
+    if killswitch.is_stopped():
+        log.warning("Kill switch triggered before run start")
+        await _emit("killswitch", {})
+        print("[STOPPED] Kill switch detected.")
+        return
+
     brain_ctx = await _assemble_brain_context(state, brain, task, app_state)
     actions = await brain.decide(state, task, brain_ctx)
+
+    if killswitch.is_stopped():
+        log.warning("Kill switch triggered during brain decide")
+        await _emit("killswitch", {})
+        print("[STOPPED] Kill switch detected.")
+        return
+
     await _emit("actions", {"count": len(actions)})
 
     loop_detector = LoopDetector()

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from agent.awareness.working import WorkingMemory
     from agent.awareness.world_context import WorldSnapshot
+    from agent.config import ContextConfig
     from agent.introspection.self_model import SelfModel
 
 
@@ -18,6 +19,7 @@ class BrainContext:
     self_model: SelfModel
     world: WorldSnapshot
     working: WorkingMemory
+    context_config: ContextConfig | None = None
     # P2 — filled by episodic recall; empty in P1
     recall: list[dict[str, Any]] = field(default_factory=list)
     # P3 — filled by reflection; empty in P1
