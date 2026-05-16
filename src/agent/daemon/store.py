@@ -11,6 +11,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from agent.config import CACHE_DIR
 from agent.schemas import RunEventRecord, RunKind, RunRecord, RunStatus, RunSummary
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ log = logging.getLogger(__name__)
 
 _LATEST_SCHEMA_VERSION = 4  # increment when a new migration is added
 
-_DB_PATH = Path.home() / ".cache" / "hyprland-agent" / "runs.db"
+_DB_PATH = CACHE_DIR / "runs.db"
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;

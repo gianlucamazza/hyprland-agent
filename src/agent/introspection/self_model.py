@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 from typing import Any
 
-from agent.config import DEFAULT_MAX_ITER, DEFAULT_RUN_TIMEOUT
+from agent.config import CACHE_DIR, CONFIG_DIR, DEFAULT_MAX_ITER, DEFAULT_RUN_TIMEOUT
 from agent.schemas import ActionKind
 
 _MAX_LOOP = DEFAULT_MAX_ITER
@@ -33,12 +32,12 @@ class SelfModel:
         }
 
     def safety_constraints(self) -> dict[str, Any]:
-        allowlist_path = Path.home() / ".config" / "hyprland-agent" / "allowlist.yaml"
+        allowlist_path = CONFIG_DIR / "allowlist.yaml"
         return {
             "always_blocked_classes": sorted(_ALWAYS_DENY),
             "allowlist_path": str(allowlist_path),
             "allowlist_exists": allowlist_path.exists(),
-            "killswitch_file": str(Path.home() / ".cache" / "hyprland-agent" / "STOP"),
+            "killswitch_file": str(CACHE_DIR / "STOP"),
         }
 
     def active_brain(self) -> str:

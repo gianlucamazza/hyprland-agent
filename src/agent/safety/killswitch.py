@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from agent.config import CACHE_DIR
 
-_FLAG = Path.home() / ".cache" / "hyprland-agent" / "STOP"
+_FLAG = CACHE_DIR / "STOP"
 
 
 def is_stopped() -> bool:

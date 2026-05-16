@@ -8,7 +8,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-_DEFAULT_DIR = Path.home() / ".cache" / "hyprland-agent" / "audit"
+from agent.config import CACHE_DIR
+
+_DEFAULT_DIR = CACHE_DIR / "audit"
 
 
 class AuditLog:

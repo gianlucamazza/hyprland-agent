@@ -70,22 +70,20 @@ def cmd_show(
 ) -> None:
     """Show effective configuration (config.yaml + paths)."""
     import json
-    from pathlib import Path
 
-    config_dir = Path.home() / ".config" / "hyprland-agent"
-    cache_dir = Path.home() / ".cache" / "hyprland-agent"
+    from agent.config import CACHE_DIR, CONFIG_DIR
 
     cfg: dict = {
-        "config_dir": str(config_dir),
-        "cache_dir": str(cache_dir),
-        "allowlist_yaml": str(config_dir / "allowlist.yaml"),
-        "rules_yaml": str(config_dir / "rules.yaml"),
-        "learned_rules_yaml": str(config_dir / "learned_rules.yaml"),
-        "runs_db": str(cache_dir / "runs.db"),
+        "config_dir": str(CONFIG_DIR),
+        "cache_dir": str(CACHE_DIR),
+        "allowlist_yaml": str(CONFIG_DIR / "allowlist.yaml"),
+        "rules_yaml": str(CONFIG_DIR / "rules.yaml"),
+        "learned_rules_yaml": str(CONFIG_DIR / "learned_rules.yaml"),
+        "runs_db": str(CACHE_DIR / "runs.db"),
         "socket": str(SOCKET_PATH),
     }
 
-    config_yaml = config_dir / "config.yaml"
+    config_yaml = CONFIG_DIR / "config.yaml"
     if config_yaml.exists():
         try:
             import yaml

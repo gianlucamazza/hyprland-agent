@@ -13,7 +13,9 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-ENV_FILE_PATH = Path.home() / ".config" / "hyprland-agent" / "env"
+from agent.config import CONFIG_DIR, AgentConfig
+
+ENV_FILE_PATH = CONFIG_DIR / "env"
 
 
 class Status(StrEnum):
@@ -58,7 +60,7 @@ def _env_value(name: str) -> tuple[str | None, str | None]:
     process_value = os.environ.get(name, "").strip()
     if process_value:
         return process_value, "process env"
-    file_value = _read_env_file().get(name, "").strip()
+    file_value = _read_env_file(ENV_FILE_PATH).get(name, "").strip()
     if file_value:
         return file_value, str(ENV_FILE_PATH)
     return None, None
@@ -152,13 +154,14 @@ def _hyprland_env() -> Check:
     )
 
 
-def _anthropic_key() -> Check:
-    from agent.config import ConfigError, load_config
+def _anthropic_key(config: AgentConfig | None = None) -> Check:
+    if config is None:
+        from agent.config import ConfigError, load_config
 
-    try:
-        config = load_config()
-    except ConfigError:
-        return Check("ANTHROPIC_API_KEY", Status.warn, "skipped due to invalid provider config")
+        try:
+            config = load_config()
+        except ConfigError:
+            return Check("ANTHROPIC_API_KEY", Status.warn, "skipped due to invalid provider config")
     if not config.brain.is_enabled("claude"):
         return Check("ANTHROPIC_API_KEY", Status.warn, "disabled by provider config")
     value, source = _env_value("ANTHROPIC_API_KEY")
@@ -173,13 +176,14 @@ def _anthropic_key() -> Check:
     return Check("ANTHROPIC_API_KEY", Status.ok, f"set in {source}")
 
 
-def _anthropic_model() -> Check:
-    from agent.config import ConfigError, load_config
+def _anthropic_model(config: AgentConfig | None = None) -> Check:
+    if config is None:
+        from agent.config import ConfigError, load_config
 
-    try:
-        config = load_config()
-    except ConfigError:
-        return Check("ANTHROPIC_MODEL", Status.warn, "skipped due to invalid provider config")
+        try:
+            config = load_config()
+        except ConfigError:
+            return Check("ANTHROPIC_MODEL", Status.warn, "skipped due to invalid provider config")
     if not config.brain.is_enabled("claude"):
         return Check("ANTHROPIC_MODEL", Status.warn, "disabled by provider config")
 
@@ -201,20 +205,22 @@ def _anthropic_model() -> Check:
     return Check("ANTHROPIC_MODEL", Status.warn, f"{model} (custom Claude model){suffix}")
 
 
-def _provider_checks() -> list[Check]:
+def _provider_checks(config: AgentConfig | None = None) -> list[Check]:
     from agent.brain.openai_brain import PROVIDERS
-    from agent.config import ConfigError, load_config
 
-    try:
-        config = load_config()
-    except ConfigError:
-        return [
-            Check(
-                "provider credentials",
-                Status.warn,
-                "skipped due to invalid provider config",
-            )
-        ]
+    if config is None:
+        from agent.config import ConfigError, load_config
+
+        try:
+            config = load_config()
+        except ConfigError:
+            return [
+                Check(
+                    "provider credentials",
+                    Status.warn,
+                    "skipped due to invalid provider config",
+                )
+            ]
     out: list[Check] = []
     for provider_key, cfg in PROVIDERS.items():
         if not config.brain.is_enabled(provider_key):
@@ -232,21 +238,28 @@ def _provider_checks() -> list[Check]:
     return out
 
 
-def _brain_config_checks() -> list[Check]:
-    from agent.config import ConfigError, load_config
+def _brain_config_checks(
+    config: AgentConfig | None = None, config_error: str | None = None
+) -> list[Check]:
+    if config is None and config_error is None:
+        from agent.config import ConfigError, load_config
 
-    try:
-        config = load_config()
-    except ConfigError as exc:
+        try:
+            config = load_config()
+        except ConfigError as exc:
+            config_error = str(exc)
+
+    if config_error is not None:
         return [
             Check(
                 "provider config",
                 Status.fail,
-                str(exc),
+                config_error,
                 "Edit ~/.config/hyprland-agent/config.yaml",
             )
         ]
 
+    assert config is not None
     enabled = [name for name in config.brain.auto_order if config.brain.is_enabled(name)]
     config_message = (
         str(config.path) if config.path.exists() else f"defaults; {config.path} not found"
@@ -265,7 +278,7 @@ def _brain_config_checks() -> list[Check]:
 
 
 def _allowlist() -> Check:
-    path = Path.home() / ".config" / "hyprland-agent" / "allowlist.yaml"
+    path = CONFIG_DIR / "allowlist.yaml"
     if path.exists():
         return Check("allowlist.yaml", Status.ok, str(path))
     return Check(
@@ -305,6 +318,15 @@ def _daemon_socket() -> Check:
 
 
 def run_all() -> list[Check]:
+    from agent.config import ConfigError, load_config
+
+    try:
+        _config: AgentConfig | None = load_config()
+        _config_error: str | None = None
+    except ConfigError as exc:
+        _config = None
+        _config_error = str(exc)
+
     return [
         _which("wtype"),
         _which("ydotool"),
@@ -315,10 +337,10 @@ def run_all() -> list[Check]:
         _uinput_group(),
         _uinput_writable(),
         _hyprland_env(),
-        *_brain_config_checks(),
-        _anthropic_key(),
-        _anthropic_model(),
-        *_provider_checks(),
+        *_brain_config_checks(_config, _config_error),
+        _anthropic_key(_config),
+        _anthropic_model(_config),
+        *_provider_checks(_config),
         _allowlist(),
         _killswitch_bind(),
         _daemon_socket(),

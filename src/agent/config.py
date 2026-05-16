@@ -10,6 +10,7 @@ import yaml
 
 CONFIG_DIR = Path.home() / ".config" / "hyprland-agent"
 CONFIG_PATH = CONFIG_DIR / "config.yaml"
+CACHE_DIR = Path.home() / ".cache" / "hyprland-agent"
 
 KNOWN_PROVIDERS = ("claude", "openai", "moonshot", "groq", "together", "zai", "qwen")
 DEFAULT_AUTO_ORDER = ("claude", "openai", "moonshot", "groq", "together", "zai", "qwen")

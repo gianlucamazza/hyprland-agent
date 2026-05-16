@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
+
+from agent.config import CONFIG_DIR
 
 if TYPE_CHECKING:
     from agent.awareness.world_context import WorldSnapshot
@@ -18,8 +19,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_LEARNED_RULES_PATH = Path.home() / ".config" / "hyprland-agent" / "learned_rules.yaml"
-_ALLOWLIST_PATH = Path.home() / ".config" / "hyprland-agent" / "allowlist.yaml"
+_LEARNED_RULES_PATH = CONFIG_DIR / "learned_rules.yaml"
+_ALLOWLIST_PATH = CONFIG_DIR / "allowlist.yaml"
 
 
 async def inject_context(
