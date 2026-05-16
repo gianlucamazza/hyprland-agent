@@ -8,6 +8,7 @@ from typing import Annotated
 import typer
 
 from agent.cli._common import _setup_logging
+from agent.paths import SERVICE_UNIT_NAME, SYSTEMD_USER_DIR, resolve_agent_bin
 
 service_app = typer.Typer(help="Daemon lifecycle (start, install systemd unit)")
 
@@ -39,15 +40,13 @@ def cmd_start(
 @service_app.command("install")
 def cmd_install() -> None:
     """Install (or upgrade) the hyprland-agent.service systemd user unit."""
-    import shutil
     import subprocess
     from pathlib import Path
 
     old_unit = "hyprland-agent-watch.service"
-    new_unit = "hyprland-agent.service"
-    systemd_dir = Path.home() / ".config" / "systemd" / "user"
+    systemd_dir = SYSTEMD_USER_DIR
     old_path = systemd_dir / old_unit
-    new_path = systemd_dir / new_unit
+    new_path = systemd_dir / SERVICE_UNIT_NAME
 
     if old_path.exists():
         typer.echo(f"Stopping {old_unit}…")
@@ -56,8 +55,7 @@ def cmd_install() -> None:
         old_path.unlink()
         typer.echo(f"Removed {old_path}")
 
-    local_agent = Path.home() / ".local" / "bin" / "agent"
-    agent_bin = str(local_agent if local_agent.exists() else shutil.which("agent") or "agent")
+    agent_bin = resolve_agent_bin()
     unit_content = f"""[Unit]
 Description=Hyprland agent daemon
 After=graphical-session.target
@@ -80,8 +78,8 @@ WantedBy=graphical-session.target
     typer.echo(f"Wrote {new_path}")
 
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
-    subprocess.run(["systemctl", "--user", "enable", "--now", new_unit], check=True)
-    typer.echo(f"✓ {new_unit} enabled and started.")
+    subprocess.run(["systemctl", "--user", "enable", "--now", SERVICE_UNIT_NAME], check=True)
+    typer.echo(f"✓ {SERVICE_UNIT_NAME} enabled and started.")
     typer.echo("Run 'agent doctor' to verify.")
 
 
@@ -111,9 +109,12 @@ def cmd_uninstall(
         typer.echo("  (note: ~/.cache/fastembed is kept — shared with other tools)")
         typer.confirm("Proceed?", abort=True)
 
-    unit_name = "hyprland-agent.service"
-    subprocess.run(["systemctl", "--user", "stop", unit_name], check=False, capture_output=True)
-    subprocess.run(["systemctl", "--user", "disable", unit_name], check=False, capture_output=True)
+    subprocess.run(
+        ["systemctl", "--user", "stop", SERVICE_UNIT_NAME], check=False, capture_output=True
+    )
+    subprocess.run(
+        ["systemctl", "--user", "disable", SERVICE_UNIT_NAME], check=False, capture_output=True
+    )
 
     for t in existing:
         if t.is_dir():

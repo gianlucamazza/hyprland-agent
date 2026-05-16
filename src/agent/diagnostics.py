@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.table import Table
 
 from agent.config import CONFIG_DIR, AgentConfig
+from agent.paths import HYPR_CONF_PATH
 
 ENV_FILE_PATH = CONFIG_DIR / "env"
 
@@ -290,7 +291,7 @@ def _allowlist() -> Check:
 
 
 def _killswitch_bind() -> Check:
-    conf = Path.home() / ".config" / "hypr" / "hyprland.conf"
+    conf = HYPR_CONF_PATH
     if not conf.exists():
         return Check("killswitch hotkey", Status.warn, "hyprland.conf not found")
     text = conf.read_text()

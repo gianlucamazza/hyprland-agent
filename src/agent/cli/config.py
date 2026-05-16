@@ -8,6 +8,7 @@ import typer
 
 from agent.cli._common import ExitCode, _run
 from agent.ipc.constants import SOCKET_PATH
+from agent.paths import HYPR_CONF_PATH, resolve_agent_bin
 
 config_app = typer.Typer(help="Configuration (no daemon required for most commands)")
 
@@ -25,16 +26,12 @@ def cmd_init_allowlist() -> None:
 @config_app.command("bind-killswitch")
 def cmd_bind_killswitch() -> None:
     """Append SUPER+SHIFT+ESC kill-switch bind to ~/.config/hypr/hyprland.conf."""
-    import shutil
-    from pathlib import Path
-
-    conf = Path.home() / ".config" / "hypr" / "hyprland.conf"
+    conf = HYPR_CONF_PATH
     if not conf.exists():
         typer.echo(f"Not found: {conf}", err=True)
         raise typer.Exit(ExitCode.error)
 
-    local_agent = Path.home() / ".local" / "bin" / "agent"
-    agent_bin = str(local_agent if local_agent.exists() else shutil.which("agent") or "agent")
+    agent_bin = resolve_agent_bin()
     bind_line = f"bind = SUPER SHIFT, escape, exec, {agent_bin} stop"
 
     text = conf.read_text()
