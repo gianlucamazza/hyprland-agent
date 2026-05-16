@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-16
+
+### Added
+
+- `src/agent/brain/anthropic_client.py` — Anthropic SDK client factory. Reads `ANTHROPIC_API_KEY`; honors `ANTHROPIC_BASE_URL` to redirect to Anthropic-compatible endpoints (e.g. Z.AI GLM Coding Plan at `https://api.z.ai/api/anthropic`).
+- `tests/test_anthropic_client.py` — 3 unit tests for the new client factory (missing key, default headers, base_url override).
+- `pyproject.toml` `[tool.pytest.ini_options]` `testpaths = ["tests"]` — prevents pytest from collecting build artifacts under `packaging/aur/src/`.
+
+### Changed
+
+- Anthropic auth is now **`ANTHROPIC_API_KEY` only**. Works against the Anthropic API natively, or against any Anthropic-compatible endpoint via `ANTHROPIC_BASE_URL`.
+- `diagnostics.py`: `Claude OAuth` doctor check replaced by `ANTHROPIC_API_KEY` check.
+- `brain/router.py`: `_claude_credentials_available()` renamed to `_anthropic_api_key_available()`.
+- Docs (README, CLAUDE.md, docs/architecture.md, docs/privacy.md, .env.example, examples/env): remove all OAuth references; document `ANTHROPIC_BASE_URL` usage.
+- Test count in CLAUDE.md/README.md corrected from 338 to 399.
+
+### Removed
+
+- `src/agent/brain/oauth_bridge.py` — OAuth token refresh against `auth.anthropic.com` (no longer needed).
+- `src/agent/daemon/credentials.py` — orphan module, no importers.
+- Support for `CLAUDE_CODE_OAUTH_TOKEN` and `~/.claude/.credentials.json` as auth sources for the `claude` brain. **Migration**: export `ANTHROPIC_API_KEY` (or add it to `~/.config/hyprland-agent/env`).
+
+### Fixed
+
+- `agent doctor --json` crashed with `AttributeError: 'Check' object has no attribute 'ok'` (`src/agent/cli/primary.py`). Now correctly uses `c.status == Status.ok`.
+
 ## [1.0.2] - 2026-05-16
 
 ### Added
