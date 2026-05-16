@@ -5,13 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.1] - 2026-05-16
+
+### Added
+
+- `docs/architecture.md` — user-facing architecture reference (daemon flow, module map, safety model, DB schema history, integrations system).
 
 ### Changed
 
-- Loosen `anthropic` constraint to `>=0.50,<1.0` (was `>=0.101.0`) to match AUR `python-anthropic` 0.97.
-- Loosen `openai` constraint to `>=2.0,<3.0` (was `>=2.36.0`) to match Arch `python-openai` 2.29.
+- Loosen `anthropic` constraint to `>=0.50,<1.0` (was `>=0.101.0`) to allow installation alongside AUR `python-anthropic` 0.97. Code verified compatible.
+- Loosen `openai` constraint to `>=2.0,<3.0` (was `>=2.36.0`) to allow installation alongside Arch `python-openai` 2.29. Code verified compatible.
 - AUR PKGBUILD: declare `python-rich` explicitly in `depends`; bump `pkgrel` to 3.
+- README: deduplicate embedder size warning, add AUR badge, document `agent --version` and `agent service uninstall` in Usage, link to new `docs/architecture.md`.
+
+### Fixed
+
+- `CONTRIBUTING.md` referenced `bge-m3` embedder (old model name) — corrected to `intfloat/multilingual-e5-large`.
+- `AGENTS.md` listed obsolete `agent daemon -v` command — corrected to `agent service start -v`.
+- `AGENTS.md` showed stale test count `180 passed` — corrected to `338 passed`.
+- `CLAUDE.md` listed non-existent `learning explain` subcommand — corrected to `learning show`.
 
 ## [1.0.0] - 2026-05-15
 

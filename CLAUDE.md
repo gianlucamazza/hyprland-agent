@@ -122,7 +122,7 @@ The orchestrator enriches every `BrainContext` via `learning/api.inject_context(
 
 **Post-action verification**: `PostActionVerifier` takes a dHash (8×8 Pillow `tobytes()`) before and after visual actions (click, mouse_move, scroll, focus_window, dispatch_hypr). Identical hash → `result.warnings.append("no visual change")`.
 
-**Learning inbox** (`agent learning {list,approve,reject,explain}`): proposals are never auto-approved. Approval side-effects:
+**Learning inbox** (`agent learning {list,approve,reject,show}`): proposals are never auto-approved. Approval side-effects:
 
 - `skill` → UPDATE `skills.status = 'approved'` in DB
 - `rule` → append YAML to `learned_rules.yaml` + daemon `reload_rules`

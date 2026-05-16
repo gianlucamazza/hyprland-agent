@@ -47,7 +47,7 @@ Scope is the module area: `brain`, `daemon`, `cli`, `tools`, `safety`, `learning
 ## Tests
 
 - Unit tests live under `tests/`. Mirror the `src/agent/` structure.
-- Mark tests that require the real bge-m3 embedder with `@pytest.mark.slow`.
+- Mark tests that require the real `intfloat/multilingual-e5-large` embedder (~1.3 GB) with `@pytest.mark.slow`.
 - Stub the embedder with `[[0.1] * 1024]` for unit tests.
 - The CI job runs `pytest -m "not slow"` — all non-slow tests must pass without a desktop/Hyprland environment.
 

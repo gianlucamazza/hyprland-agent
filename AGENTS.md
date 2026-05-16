@@ -12,7 +12,7 @@ The architecture is daemon-centric: CLI and TUI clients talk to the daemon over 
 - `uv run pytest`: run the full test suite.
 - `uv run pytest tests/test_input.py`: run one test module while iterating.
 - `uv run agent doctor`: check local prerequisites, sockets, credentials, and configuration.
-- `uv run agent daemon -v`: run the daemon in the foreground for local debugging.
+- `uv run agent service start -v`: run the daemon in the foreground for local debugging.
 - `uv run agent plan "<task>"`: plan actions without executing desktop actions.
 - `scripts/install-local.sh`: build and install the host runtime outside the source checkout.
 - `scripts/verify-local-install.sh`: verify the user service is not importing from the repo venv.
@@ -33,7 +33,7 @@ Hyprland command/event integration uses native Hyprland Unix sockets, not `hyprc
 
 The project uses `pytest`, `pytest-asyncio` in auto mode, and `pytest-textual-snapshot` for TUI snapshots. Add focused tests beside related coverage in `tests/` when changing safety gates, IPC contracts, provider routing, or Hyprland action translation. For TUI changes, update snapshots intentionally and inspect `snapshot_report.html` when a snapshot fails.
 
-The documented current full-suite state is `180 passed`. If `tests/test_tui.py::test_tui_error_screen_snapshot` fails after a TUI change, inspect `snapshot_report.html` and update the snapshot intentionally.
+The documented current full-suite state is `338 passed`. If `tests/test_tui.py::test_tui_error_screen_snapshot` fails after a TUI change, inspect `snapshot_report.html` and update the snapshot intentionally.
 
 ## Commit & Pull Request Guidelines
 

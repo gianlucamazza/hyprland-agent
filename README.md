@@ -4,6 +4,7 @@
 [![CI](https://github.com/gianlucamazza/hyprland-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/gianlucamazza/hyprland-agent/actions/workflows/ci.yml)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
 [![Release](https://img.shields.io/github/v/release/gianlucamazza/hyprland-agent)](https://github.com/gianlucamazza/hyprland-agent/releases)
+[![AUR version](https://img.shields.io/aur/version/hyprland-agent)](https://aur.archlinux.org/packages/hyprland-agent)
 
 > **Requires: Linux + Wayland + Hyprland + Python 3.13+**
 
@@ -13,7 +14,7 @@ allowlists, a kill switch, local run history, and daemon-side observability.
 
 ## Quickstart
 
-> **Note**: first `agent run` downloads `intfloat/multilingual-e5-large` (~1.3 GB) for episodic memory. Disable with `memory.enabled: false` if you want to skip it.
+> **Note**: first `agent run` downloads the episodic memory model (~1.3 GB). See [Prerequisites](#prerequisites) for details or how to skip it.
 
 ```bash
 # 1. Install system deps (Arch)
@@ -62,6 +63,8 @@ actions through Wayland/Hyprland tools, and records what happened.
 - Not a safe way to expose your desktop socket to other users or machines.
 
 ## Architecture
+
+See [`docs/architecture.md`](docs/architecture.md) for a detailed breakdown of modules, providers, safety model, and DB schema versioning. Overview below:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -334,9 +337,15 @@ agent learning approve rule <id>       # write rule to learned_rules.yaml
 agent learning approve allowlist <id>  # write entry to allowlist.yaml
 agent learning reject skill <id>       # discard
 
-# Health check and kill switch
+# Health check, version, and kill switch
+agent --version
 agent doctor
 agent stop
+
+# Service management
+agent service start -v         # run daemon in foreground (debug)
+agent service install          # install systemd user unit
+agent service uninstall        # remove config + cache + systemd unit
 
 # Integrations
 agent-waybar --watch          # stream Waybar JSON to stdout
@@ -513,7 +522,7 @@ agent learning reject rule <id> --reason "too broad"
 
 In the TUI, press **Ctrl+I** to open the Learning Inbox.
 
-Episodic memory (past runs) is used to inject relevant context into every new task. The first embed call downloads `intfloat/multilingual-e5-large` (~1.3 GB) to `~/.cache/fastembed`; subsequent calls are instant.
+Episodic memory (past runs) is used to inject relevant context into every new task. The embedder model is downloaded on first use (see [Prerequisites](#prerequisites)); subsequent calls are instant.
 
 ## Run storage
 
