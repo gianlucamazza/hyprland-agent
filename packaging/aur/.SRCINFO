@@ -31,6 +31,6 @@ pkgbase = hyprland-agent
 	provides = hyprland-agent
 	conflicts = hyprland-agent
 	source = hyprland-agent-1.4.0.tar.gz::https://github.com/gianlucamazza/hyprland-agent/archive/refs/tags/v1.4.0.tar.gz
-	sha256sums = SKIP  # update after tag
+	sha256sums = 595ed11d9abf18af3a4721341d95672c0f08cdf3e800994be0be8fb47b05d212
 
 pkgname = hyprland-agent
