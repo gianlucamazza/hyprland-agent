@@ -32,14 +32,14 @@ dependencies = [
   "anthropic>=0.50,<1.0",
   "openai>=2.0,<3.0",
   "pillow>=12.2.0",
-  "pydantic>=2.13.4",
+  "pydantic>=2.13.4,<3",
   "pyyaml>=6.0.3",
-  "textual>=0.85.0",
-  "typer>=0.25.1",
+  "textual>=0.85.0,<9",
+  "typer>=0.25.1,<1",
   "fastembed>=0.4",
   "sqlite-vec>=0.1.6,<0.2",
   "jeepney>=0.8",
-  "rich>=13",
+  "rich>=15,<16",
 ]
 
 [project.urls]
