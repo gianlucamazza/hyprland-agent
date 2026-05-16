@@ -13,7 +13,7 @@ hyprland-agent is a daemon that issues **real keyboard/mouse input**, captures *
 
 **Do not open a public issue for security vulnerabilities.**
 
-Email: **homen3@gmail.com** with subject `[hyprland-agent security] <short description>`.
+Email: **info@gianlucamazza.it** with subject `[hyprland-agent security] <short description>`.
 
 Include:
 - Description of the vulnerability and its potential impact.
