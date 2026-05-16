@@ -149,6 +149,12 @@ mismatch causes the integration to be skipped.
 Console scripts: `agent-waybar` (`cli/waybar_module.py`) and `fuzzel-agent`
 (`cli/fuzzel_launcher.py`) are thin async RPC clients over the daemon socket.
 
+**Desktop launcher**: the AUR package installs
+`packaging/desktop/hyprland-agent-tui.desktop` to `/usr/share/applications/`.
+It opens the monitoring TUI via `foot --app-id=hyprland-agent-tui agent tui`.
+The `StartupWMClass=hyprland-agent-tui` field lets Hyprland window rules match it
+by class. Requires `foot` (listed as `optdepend`).
+
 ---
 
 ## Configuration and paths

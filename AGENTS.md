@@ -2,22 +2,19 @@
 
 ## Project Structure & Module Organization
 
-This is a Python 3.13 `uv` project for a local-first Hyprland/Wayland desktop agent. Runtime code lives in `src/agent/`. Key modules are `daemon/` for the long-running server, `client/` for RPC clients, `ipc/` for NDJSON protocol framing, `brain/` for model providers, `tools/` for Hyprland/screen/input integrations, `safety/` for allowlist and kill switch logic, and `tui/` for the Textual UI. Tests live in `tests/`, with Textual snapshots under `tests/__snapshots__/`. User-facing setup and operational behavior are documented in `README.md`; Claude-specific implementation notes are in `CLAUDE.md`.
+This is a Python 3.13 `uv` project for a local-first Hyprland/Wayland desktop agent. Runtime code lives in `src/agent/`. Key modules are `daemon/` for the long-running server, `client/` for RPC clients, `ipc/` for NDJSON protocol framing, `brain/` for model providers, `tools/` for Hyprland/screen/input integrations, `safety/` for allowlist and kill switch logic, and `tui/` for the Textual UI. Tests live in `tests/`, with Textual snapshots under `tests/__snapshots__/`. User-facing setup is in `README.md`; the high-level architecture reference for contributors is in [`docs/architecture.md`](docs/architecture.md); implementation notes and gotchas for AI assistants are in `CLAUDE.md`.
 
 The architecture is daemon-centric: CLI and TUI clients talk to the daemon over NDJSON on `$XDG_RUNTIME_DIR/hyprland-agent.sock` with mode `0600`, while state, run execution, pubsub, and tool dispatch remain daemon-owned. Shared Pydantic schemas live in `src/agent/schemas.py`; keep IPC contracts in `src/agent/ipc/`, including the protocol version and 1 MiB frame limit.
 
 ## Build, Test, and Development Commands
 
-- `uv sync`: install project and development dependencies from `pyproject.toml` and `uv.lock`.
-- `uv run pytest`: run the full test suite.
-- `uv run pytest tests/test_input.py`: run one test module while iterating.
-- `uv run agent doctor`: check local prerequisites, sockets, credentials, and configuration.
-- `uv run agent service start -v`: run the daemon in the foreground for local debugging.
-- `uv run agent plan "<task>"`: plan actions without executing desktop actions.
-- `scripts/install-local.sh`: build and install the host runtime outside the source checkout.
-- `scripts/verify-local-install.sh`: verify the user service is not importing from the repo venv.
+The full command reference lives in [`CLAUDE.md`](CLAUDE.md#commands). Quick pointers:
 
-There is no Makefile and no Ruff configuration in `pyproject.toml`. The Typer entry point is `agent = "agent.cli:app"`.
+- `uv sync` / `uv run pytest` / `uv run agent doctor` for setup, test, and health check.
+- `uv run agent service start -v` runs the daemon in the foreground.
+- `scripts/install-local.sh` installs the host runtime outside the source checkout.
+
+There is no Makefile. The Typer entry point is `agent = "agent.cli:app"`.
 
 ## Coding Style & Naming Conventions
 

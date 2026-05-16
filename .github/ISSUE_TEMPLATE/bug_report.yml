@@ -32,7 +32,7 @@ body:
     id: version
     attributes:
       label: hyprland-agent version
-      placeholder: "e.g. 1.0.0 (from `agent --version`)"
+      placeholder: "e.g. 1.0.2 (from `agent --version`)"
     validations:
       required: true
   - type: input

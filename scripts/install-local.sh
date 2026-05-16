@@ -141,6 +141,14 @@ if [[ ! -f "$env_dest" && -f "$repo_root/.env.example" ]]; then
 	echo "Created template: $env_dest (edit before adding provider keys)"
 fi
 
+# --- Desktop entry ---
+desktop_src="$repo_root/packaging/desktop/hyprland-agent-tui.desktop"
+desktop_dest="${XDG_DATA_HOME:-$HOME/.local/share}/applications/hyprland-agent-tui.desktop"
+if [[ -f "$desktop_src" ]]; then
+	install -Dm644 "$desktop_src" "$desktop_dest"
+	echo "Installed:   $desktop_dest"
+fi
+
 # --- Systemd: optional ---
 if [[ -z "$skip_systemd" ]] && command -v systemctl &>/dev/null; then
 	agent_launcher="$bin_dir/agent"

@@ -26,7 +26,7 @@ agent-waybar --watch           # stream Waybar JSON (run after install)
 fuzzel-agent                   # fuzzel dmenu to re-run a recent task
 ```
 
-No Makefile, no ruff config in `pyproject.toml` despite `.ruff_cache/` being present. `pytest-asyncio` is in auto mode (`pyproject.toml:37`).
+No Makefile. `pytest-asyncio` is in auto mode (`pyproject.toml:90`). Ruff config lives in `[tool.ruff]` (lines 107-113); mypy config in `[tool.mypy]`.
 
 Entry point: `agent = "agent.cli:app"` (typer).
 
@@ -162,6 +162,8 @@ Entry-points group `hyprland_agent.integrations` — third-party packages can re
 | `integrations/waybar.py` | `WaybarIntegration` | server-side no-op; client is `cli/waybar_module.py` |
 | `integrations/fuzzel.py` | `FuzzelIntegration` | binary probe; client is `cli/fuzzel_launcher.py` |
 | `integrations/idle.py` | `IdleIntegration` | D-Bus `org.freedesktop.ScreenSaver` → cancel active runs on lock |
+
+**Desktop launcher**: `packaging/desktop/hyprland-agent-tui.desktop` ships via the AUR package (`/usr/share/applications/`). Exec: `foot --app-id=hyprland-agent-tui agent tui`. Requires `foot` (declared as `optdepend` in PKGBUILD).
 
 **Console scripts:** `agent-waybar` → `cli/waybar_module.py:main`; `fuzzel-agent` → `cli/fuzzel_launcher.py:main`. Both are thin async clients over the daemon socket.
 

@@ -20,13 +20,13 @@
    ```
 4. Update `sha256sums` in PKGBUILD with the real hash of the release tarball:
    ```bash
-   curl -sL https://github.com/gianlucamazza/hyprland-agent/archive/refs/tags/v1.0.0.tar.gz | sha256sum
+   curl -sL https://github.com/gianlucamazza/hyprland-agent/archive/refs/tags/v1.0.2.tar.gz | sha256sum
    ```
    Replace `SKIP` in PKGBUILD with the hash, regenerate `.SRCINFO`.
 5. Commit and push:
    ```bash
    git add PKGBUILD .SRCINFO
-   git commit -m "Update to v1.0.0"
+   git commit -m "Update to v1.0.2"
    git push
    ```
 

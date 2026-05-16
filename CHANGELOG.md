@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-05-16
+
+### Added
+
+- `packaging/desktop/hyprland-agent-tui.desktop` — XDG desktop entry that launches the monitoring TUI in a new `foot` terminal window. Installed to `/usr/share/applications/` by the AUR package. `foot` listed in `optdepends`.
+
+### Changed
+
+- AUR PKGBUILD: add `foot` to `optdepends` (required by the `hyprland-agent-tui.desktop` launcher); `pkgver` bump resets `pkgrel` to 1.
+- `AGENTS.md`: collapse duplicated Commands section to a pointer to `CLAUDE.md` (single source of truth for command reference); add link to `docs/architecture.md`.
+- `AGENTS.md` / `CLAUDE.md`: correct false statement that `pyproject.toml` has no Ruff configuration — `[tool.ruff]` lives at lines 107-113.
+
+### Fixed
+
+- `CHANGELOG.md` `[1.0.1]` entry claimed AUR PKGBUILD bumped `pkgrel` to 3 — the v1.0.1 publish was `1.0.1-1` (pkgver reset from `1.0.0-3`).
+- `.github/ISSUE_TEMPLATE/bug_report.yml` version placeholder still showed `1.0.0` — refreshed to `1.0.2`.
+- `packaging/aur/README.md` documentation examples still referenced `v1.0.0` URLs and commit messages — updated to `v1.0.2`.
+
 ## [1.0.1] - 2026-05-16
 
 ### Added
@@ -15,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Loosen `anthropic` constraint to `>=0.50,<1.0` (was `>=0.101.0`) to allow installation alongside AUR `python-anthropic` 0.97. Code verified compatible.
 - Loosen `openai` constraint to `>=2.0,<3.0` (was `>=2.36.0`) to allow installation alongside Arch `python-openai` 2.29. Code verified compatible.
-- AUR PKGBUILD: declare `python-rich` explicitly in `depends`; bump `pkgrel` to 3.
+- AUR PKGBUILD: declare `python-rich` explicitly in `depends`; publish as `1.0.1-1` (pkgver reset).
 - README: deduplicate embedder size warning, add AUR badge, document `agent --version` and `agent service uninstall` in Usage, link to new `docs/architecture.md`.
 
 ### Fixed

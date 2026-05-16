@@ -1,7 +1,7 @@
 pkgbase = hyprland-agent
 	pkgdesc = Local-first agentic desktop controller for Hyprland / Wayland
 	pkgver = 1.0.1
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/gianlucamazza/hyprland-agent
 	arch = any
 	license = Apache-2.0

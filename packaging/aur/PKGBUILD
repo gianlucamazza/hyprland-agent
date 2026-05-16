@@ -1,7 +1,7 @@
 # Maintainer: Gianluca <homen3@gmail.com>
 pkgname=hyprland-agent
 pkgver=1.0.1
-pkgrel=1
+pkgrel=2
 pkgdesc="Local-first agentic desktop controller for Hyprland / Wayland"
 arch=('any')
 url="https://github.com/gianlucamazza/hyprland-agent"
@@ -34,6 +34,7 @@ optdepends=(
     'mako: desktop notifications via notify-send'
     'waybar: agent-waybar status module'
     'fuzzel: fuzzel-agent task launcher'
+    'foot: terminal emulator used by the hyprland-agent-tui.desktop launcher'
 )
 makedepends=('python-installer' 'python-build' 'uv')
 provides=('hyprland-agent')
@@ -54,6 +55,10 @@ package() {
     # systemd user service
     install -Dm644 packaging/systemd/hyprland-agent.service \
         "${pkgdir}/usr/lib/systemd/user/hyprland-agent.service"
+
+    # desktop entry
+    install -Dm644 packaging/desktop/hyprland-agent-tui.desktop \
+        "${pkgdir}/usr/share/applications/hyprland-agent-tui.desktop"
 
     # docs
     install -Dm644 README.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"

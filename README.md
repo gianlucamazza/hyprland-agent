@@ -352,6 +352,12 @@ agent-waybar --watch          # stream Waybar JSON to stdout
 fuzzel-agent                  # pick and re-run a recent task via fuzzel
 ```
 
+### Desktop launcher
+
+The AUR package installs a `.desktop` entry that opens the monitoring TUI in a new
+`foot` terminal window. Look for **Hyprland Agent (TUI)** in your application launcher
+(fuzzel/rofi/wofi). Requires `foot` to be installed (listed in `optdepends`).
+
 ## Kill switch
 
 During a running task, press `SUPER+SHIFT+ESC` to arm the kill switch. The agent

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hyprland Agent (TUI)
+GenericName=Hyprland Agent Monitor
+Comment=Monitoring TUI for the hyprland-agent daemon
+Exec=foot --app-id=hyprland-agent-tui "--title=Hyprland Agent" agent tui
+Terminal=false
+Icon=utilities-terminal
+Categories=System;
+Keywords=hyprland;agent;daemon;monitor;learning;
+StartupWMClass=hyprland-agent-tui
