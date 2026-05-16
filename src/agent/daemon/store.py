@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_LATEST_SCHEMA_VERSION = 4  # increment when a new migration is added
+_LATEST_SCHEMA_VERSION = 5  # increment when a new migration is added
 
 _DB_PATH = CACHE_DIR / "runs.db"
 
@@ -105,6 +105,8 @@ class RunStore:
             self._apply_v3_migration(conn)
         if user_ver < 4:
             self._apply_v4_migration(conn)
+        if user_ver < 5:
+            self._apply_v5_migration(conn)
 
     def _apply_v2_migration(self, conn: sqlite3.Connection) -> None:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(runs)").fetchall()}
@@ -721,6 +723,79 @@ class RunStore:
             )
         conn.execute("PRAGMA user_version=4")
         conn.commit()
+
+    def _apply_v5_migration(self, conn: sqlite3.Connection) -> None:
+        """Add decay_score and last_accessed_at columns for memory decay."""
+        for table in ("episodes", "reflections"):
+            cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            if "decay_score" not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN decay_score REAL DEFAULT 1.0")
+            if "last_accessed_at" not in cols:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN last_accessed_at REAL DEFAULT (strftime('%s','now'))"
+                )
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(skills)").fetchall()}
+        if "decay_score" not in cols:
+            conn.execute("ALTER TABLE skills ADD COLUMN decay_score REAL DEFAULT 1.0")
+        conn.execute("PRAGMA user_version=5")
+        conn.commit()
+
+    # ------------------------------------------------------------------
+    # Memory decay (v5)
+    # ------------------------------------------------------------------
+
+    async def prune_decayed(
+        self,
+        threshold: float = 0.1,
+        half_life_days: int = 90,
+    ) -> dict[str, int]:
+        """Delete memory records whose decay_score has fallen below *threshold*.
+
+        Before pruning, scores are recalculated using a simple exponential
+        decay formula::
+
+            score = 1.0 * 0.5 ** (elapsed_days / half_life_days)
+
+        Returns a dict of ``{table: deleted_count}``.
+        """
+        return await self._run_sync(self._do_prune_decayed, threshold, half_life_days)
+
+    def _do_prune_decayed(
+        self,
+        conn: sqlite3.Connection,
+        threshold: float,
+        half_life_days: int,
+    ) -> dict[str, int]:
+        half_life_s = half_life_days * 86400
+        now = time.time()
+        result: dict[str, int] = {}
+
+        for table in ("episodes", "reflections", "skills"):
+            ref_col = "created_at" if table != "skills" else "created_at"
+            conn.execute(
+                f"""
+                UPDATE {table}
+                SET decay_score = POW(0.5, (? - COALESCE(last_accessed_at, {ref_col}, ?)) / ?)
+                WHERE 1=1
+                """,
+                (now, now, half_life_s),
+            )
+            deleted = conn.execute(
+                f"DELETE FROM {table} WHERE decay_score < ?", (threshold,)
+            ).rowcount
+            result[table] = deleted
+
+        conn.commit()
+        return result
+
+    async def touch_memory(self, table: str, row_id_col: str, row_id: str) -> None:
+        """Update ``last_accessed_at`` for a memory row to prevent decay."""
+        await self._run_sync(
+            lambda conn: conn.execute(
+                f"UPDATE {table} SET last_accessed_at=strftime('%s','now'), decay_score=1.0 WHERE {row_id_col}=?",
+                (row_id,),
+            )
+        )
 
     # ------------------------------------------------------------------
     # Skill library (P4)

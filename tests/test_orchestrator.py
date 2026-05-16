@@ -158,7 +158,7 @@ async def test_run_executes_terminal_command_in_owned_terminal(
     monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
     monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
     monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
-    run_command = AsyncMock(return_value=(0, "", ""))
+    run_command = AsyncMock(return_value=(0, "", "", 0))
     monkeypatch.setattr("agent.orchestrator.terminal.run_command", run_command)
 
     await run("write file", brain, ctx=RunContext(run_id="run-1", _emit_fn=emit))
@@ -169,6 +169,8 @@ async def test_run_executes_terminal_command_in_owned_terminal(
         emit=ANY,
         hold_s=3.0,
         visible=True,
+        capture_cap=8192,
+        stdin=None,
     )
     assert [event[0] for event in events] == [
         "start",
@@ -221,3 +223,99 @@ async def test_keyboard_action_blocked_in_control_terminal(
     type_text.assert_not_awaited()
     blocked = [payload for kind, payload in events if kind == "blocked"]
     assert blocked[0]["reason"] == "control_terminal_keyboard_target"
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_action_returns_blocked_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Orchestrator returns blocked when rate limiter denies the action."""
+    brain = _Brain()
+    brain.decide = AsyncMock(  # type: ignore[method-assign]
+        return_value=[Action(kind=ActionKind.type_text, params={"text": "hello"})]
+    )
+
+    async def emit(kind: str, payload: dict) -> None:
+        pass
+
+    async def active_window() -> Window:
+        return _window("foot")
+
+    async def active_monitor() -> Monitor:
+        return Monitor(
+            id=0, name="DP-1", width=1920, height=1080, x=0, y=0, scale=1.0, focused=True
+        )
+
+    monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
+    monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
+    monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
+    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
+    monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
+    monkeypatch.setattr(
+        "agent.orchestrator._focused_control_terminal", AsyncMock(return_value=None)
+    )
+
+    # Exhaust the rate limit for type_text (limit is 30/min)
+    monkeypatch.setattr("agent.orchestrator._rate_limiter", _ExhaustedLimiter())
+
+    from agent.orchestrator import _execute_action
+
+    action = Action(kind=ActionKind.type_text, params={"text": "hello"})
+    result = await _execute_action(action, ctx=None)
+    assert result.blocked == "rate_limited"
+
+
+@pytest.mark.asyncio
+async def test_unsafe_terminal_command_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Orchestrator blocks terminal_command with dangerous patterns."""
+    brain = _Brain()
+    brain.decide = AsyncMock(  # type: ignore[method-assign]
+        return_value=[Action(kind=ActionKind.terminal_command, params={"command": "rm -rf /"})]
+    )
+
+    async def emit(kind: str, payload: dict) -> None:
+        pass
+
+    async def active_window() -> Window:
+        return _window("foot")
+
+    async def active_monitor() -> Monitor:
+        return Monitor(
+            id=0, name="DP-1", width=1920, height=1080, x=0, y=0, scale=1.0, focused=True
+        )
+
+    monkeypatch.setattr("agent.orchestrator.hypr.active_window", active_window)
+    monkeypatch.setattr("agent.orchestrator.hypr.active_monitor", active_monitor)
+    monkeypatch.setattr("agent.orchestrator.hypr.clients", AsyncMock(return_value=[]))
+    monkeypatch.setattr("agent.orchestrator.screen.full", AsyncMock(return_value=b"png"))
+    monkeypatch.setattr("agent.orchestrator.is_allowed", lambda window: True)
+    monkeypatch.setattr("agent.orchestrator._rate_limiter", _AlwaysAllowLimiter())
+
+    from agent.orchestrator import _execute_action
+
+    action = Action(kind=ActionKind.terminal_command, params={"command": "rm -rf /"})
+    result = await _execute_action(action, ctx=RunContext(run_id="run-1", _emit_fn=emit))
+    assert result.blocked is not None
+    assert "unsafe_command" in result.blocked
+
+
+class _ExhaustedLimiter:
+    """Rate limiter stub that denies every check."""
+
+    def check(self, kind: str) -> bool:
+        return False
+
+    def reconfigure(self, cfg: Any) -> None:
+        pass
+
+
+class _AlwaysAllowLimiter:
+    """Rate limiter stub that allows every check."""
+
+    def check(self, kind: str) -> bool:
+        return True
+
+    def reconfigure(self, cfg: Any) -> None:
+        pass

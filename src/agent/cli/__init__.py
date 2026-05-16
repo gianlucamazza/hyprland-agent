@@ -21,6 +21,7 @@ from agent.cli.primary import (
 )
 from agent.cli.runs import runs_app
 from agent.cli.service import service_app
+from agent.cli.voice import voice_app
 
 app = typer.Typer(no_args_is_help=True, help="Hyprland desktop agent")
 
@@ -56,3 +57,4 @@ app.add_typer(hypr_app, name="hypr")
 app.add_typer(memory_app, name="memory")
 app.add_typer(config_app, name="config")
 app.add_typer(service_app, name="service")
+app.add_typer(voice_app, name="voice")

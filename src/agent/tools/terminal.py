@@ -11,7 +11,7 @@ EmitFn = Callable[[str, dict], Awaitable[None]]
 
 _DEFAULT_TIMEOUT = 300.0
 _MAX_HOLD_S = 30.0
-_CAPTURE_CAP = 8192  # bytes kept from stdout/stderr tail
+_DEFAULT_CAPTURE_CAP = 8192  # bytes kept from stdout/stderr tail
 
 
 async def run_command(
@@ -22,16 +22,21 @@ async def run_command(
     timeout: float = _DEFAULT_TIMEOUT,
     hold_s: float = 0.0,
     visible: bool = True,
-) -> tuple[int, str, str]:
+    capture_cap: int = _DEFAULT_CAPTURE_CAP,
+    stdin: str | None = None,
+) -> tuple[int, str, str, int]:
     """Run a shell command.
 
     visible=True (default): spawns a dedicated foot terminal window.
-    visible=False: runs headlessly via shell, captures stdout/stderr (8 KB cap).
-    Returns (returncode, stdout, stderr). stdout/stderr are empty when visible=True.
+    visible=False: runs headlessly via shell, captures stdout/stderr (capped).
+    Returns (returncode, stdout, stderr, total_bytes).
+    stdout/stderr are empty and total_bytes is 0 when visible=True.
     """
     if visible:
         return await _run_visible(command, run_id=run_id, emit=emit, timeout=timeout, hold_s=hold_s)
-    return await _run_capture(command, run_id=run_id, emit=emit, timeout=timeout)
+    return await _run_capture(
+        command, run_id=run_id, emit=emit, timeout=timeout, capture_cap=capture_cap, stdin=stdin
+    )
 
 
 async def _run_visible(
@@ -41,7 +46,7 @@ async def _run_visible(
     emit: EmitFn | None = None,
     timeout: float,
     hold_s: float,
-) -> tuple[int, str, str]:
+) -> tuple[int, str, str, int]:
     title = f"hyprland-agent:{run_id}"
     hold_s = _clamp_hold_s(hold_s)
     if emit is not None:
@@ -76,7 +81,7 @@ async def _run_visible(
         await emit("terminal_exited", {"title": title, "returncode": code, "visible": True})
     if code != 0:
         raise RuntimeError(f"terminal command exited with status {code}")
-    return code, "", ""
+    return code, "", "", 0
 
 
 async def _run_capture(
@@ -85,7 +90,9 @@ async def _run_capture(
     run_id: str,
     emit: EmitFn | None = None,
     timeout: float,
-) -> tuple[int, str, str]:
+    capture_cap: int = _DEFAULT_CAPTURE_CAP,
+    stdin: str | None = None,
+) -> tuple[int, str, str, int]:
     title = f"hyprland-agent:{run_id}"
     if emit is not None:
         await emit(
@@ -95,11 +102,17 @@ async def _run_capture(
 
     proc = await asyncio.create_subprocess_shell(
         command,
+        stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        if stdin is not None:
+            stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(input=stdin.encode()), timeout=timeout
+            )
+        else:
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except TimeoutError:
         proc.kill()
         await proc.wait()
@@ -113,9 +126,13 @@ async def _run_capture(
             await emit("terminal_cancelled", {"title": title})
         raise
 
-    stdout = stdout_b.decode(errors="replace")[-_CAPTURE_CAP:]
-    stderr = stderr_b.decode(errors="replace")[-_CAPTURE_CAP:]
+    total_bytes = len(stdout_b)
+    stdout = stdout_b.decode(errors="replace")[-capture_cap:]
+    stderr = stderr_b.decode(errors="replace")[-capture_cap:]
     code = proc.returncode or 0
+
+    if total_bytes > capture_cap:
+        stdout = f"... [truncated, {total_bytes} total bytes, showing last {len(stdout)}]\n{stdout}"
 
     if emit is not None:
         await emit(
@@ -131,7 +148,7 @@ async def _run_capture(
 
     if code != 0:
         raise RuntimeError(f"command exited with status {code}: {stderr[:200]}")
-    return code, stdout, stderr
+    return code, stdout, stderr, total_bytes
 
 
 def _clamp_hold_s(value: float) -> float:

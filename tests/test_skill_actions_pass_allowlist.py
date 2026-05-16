@@ -60,3 +60,52 @@ def test_skill_approval_does_not_modify_is_allowed(tmp_path):
     # After approval, keepassxc is still blocked
     w = _window("keepassxc")
     assert is_allowed(w) is False
+
+
+def test_is_binary_allowed_defaults():
+    """Default binary allowlist permits known binaries."""
+    from agent.safety.allowlist import _DEFAULT_BINARY_ALLOWLIST, is_binary_allowed
+
+    for name in _DEFAULT_BINARY_ALLOWLIST:
+        assert is_binary_allowed(name) is True
+    assert is_binary_allowed("unknown-binary") is False
+
+
+def test_is_binary_allowed_yaml_override(tmp_path, monkeypatch):
+    """YAML binaries list overrides the default set."""
+    import yaml
+
+    from agent.safety.allowlist import is_binary_allowed
+
+    fake_path = tmp_path / "allowlist.yaml"
+    fake_path.write_text(yaml.dump({"binaries": ["my-custom-bin"]}))
+    monkeypatch.setattr("agent.safety.allowlist._CONFIG_PATH", fake_path)
+
+    assert is_binary_allowed("my-custom-bin") is True
+    assert is_binary_allowed("notify-send") is False
+
+
+def test_is_binary_allowed_missing_file_falls_back(tmp_path, monkeypatch):
+    """Missing allowlist.yaml falls back to the hardcoded default."""
+    from agent.safety.allowlist import is_binary_allowed
+
+    fake_path = tmp_path / "nonexistent.yaml"
+    assert not fake_path.exists()
+    monkeypatch.setattr("agent.safety.allowlist._CONFIG_PATH", fake_path)
+
+    assert is_binary_allowed("wl-copy") is True
+    assert is_binary_allowed("nope") is False
+
+
+def test_is_binary_allowed_empty_yaml_binaries_falls_back(tmp_path, monkeypatch):
+    """YAML with ``binaries:`` key set to null falls back to defaults."""
+    import yaml
+
+    from agent.safety.allowlist import is_binary_allowed
+
+    fake_path = tmp_path / "allowlist.yaml"
+    fake_path.write_text(yaml.dump({"binaries": None}))
+    monkeypatch.setattr("agent.safety.allowlist._CONFIG_PATH", fake_path)
+
+    assert is_binary_allowed("wl-copy") is True
+    assert is_binary_allowed("nope") is False

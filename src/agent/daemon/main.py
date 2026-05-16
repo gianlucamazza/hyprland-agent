@@ -33,6 +33,24 @@ async def _killswitch_poller(state: AppState, shutdown: asyncio.Event) -> None:
         await asyncio.sleep(_KILLSWITCH_POLL)
 
 
+async def _memory_decay_loop(state: AppState, interval_s: int) -> None:
+    """Periodically prune decayed memory records."""
+    cfg = state.config.learning.decay
+    if not cfg.enabled:
+        return
+    while True:
+        await asyncio.sleep(interval_s)
+        try:
+            result = await state.store.prune_decayed(
+                threshold=cfg.prune_threshold, half_life_days=cfg.half_life_days
+            )
+            total = sum(result.values())
+            if total:
+                log.info("Memory decay pruned %d record(s): %s", total, result)
+        except Exception as exc:
+            log.warning("Memory decay cleanup failed: %s", exc)
+
+
 async def run(socket_path: Path = SOCKET_PATH) -> None:
     """Start the daemon and block until SIGTERM/SIGINT."""
     logging.basicConfig(
@@ -59,6 +77,9 @@ async def run(socket_path: Path = SOCKET_PATH) -> None:
 
     log.info("Daemon starting (socket: %s)", socket_path)
 
+    decay_interval = state.config.learning.decay.cleanup_interval_s
+    decay_task = asyncio.create_task(_memory_decay_loop(state, decay_interval), name="memory-decay")
+
     server_task = asyncio.create_task(serve(state, socket_path))
     watcher_task = asyncio.create_task(run_watcher(state))
     poller_task = asyncio.create_task(_killswitch_poller(state, shutdown))
@@ -71,10 +92,10 @@ async def run(socket_path: Path = SOCKET_PATH) -> None:
     for run_id in await state.executor.active_run_ids():
         await state.executor.cancel(run_id)
 
-    for task in (server_task, watcher_task, poller_task):
+    for task in (server_task, watcher_task, poller_task, decay_task):
         task.cancel()
 
-    await asyncio.gather(server_task, watcher_task, poller_task, return_exceptions=True)
+    await asyncio.gather(server_task, watcher_task, poller_task, decay_task, return_exceptions=True)
 
     await state.close()
 

@@ -10,6 +10,7 @@ from agent.daemon.pubsub import PubSub
 from agent.daemon.run_executor import RunExecutor
 from agent.daemon.store import RunStore
 from agent.integrations import IntegrationRegistry
+from agent.learning.allowlist import AllowlistMiner
 from agent.learning.consumer import LearningConsumer
 from agent.learning.reflection import ReflectionEngine
 from agent.memory.embedder import FastEmbedder
@@ -45,7 +46,19 @@ class AppState:
 
         self.rules = await load_rules()
         if self.config.memory.enabled:
-            self.learning = LearningConsumer(self.pubsub, self.episodic, self.reflection)
+            lr = self.config.learning
+            allowlist_miner = AllowlistMiner(self.store) if lr.allowlist_mining_enabled else None
+            from agent.learning.rules import RuleMiner
+
+            rule_miner = RuleMiner(self.store) if lr.rule_mining_enabled else None
+            self.learning = LearningConsumer(
+                self.pubsub,
+                self.episodic,
+                self.reflection,
+                allowlist_miner=allowlist_miner,
+                rule_miner=rule_miner,
+                mining_interval_s=lr.mining_interval_s,
+            )
             await self.learning.open()
 
     async def close(self, executor_timeout: float = 5.0) -> None:

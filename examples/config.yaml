@@ -41,5 +41,9 @@ learning:
 
 integrations:
   # Empty list = load all discovered integrations.
-  # List names to restrict: [mako, waybar, fuzzel]
+  # List names to restrict: [mako, waybar, fuzzel, voice]
   enabled: []
+
+  # voice:
+  #   enabled: false               # enable the voice subsystem (M1+)
+  # Full voice config lives in voice.yaml

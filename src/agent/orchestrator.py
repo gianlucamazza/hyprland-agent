@@ -15,8 +15,9 @@ from agent.brain.context import BrainContext
 from agent.introspection.self_model import SelfModel
 from agent.safety import confirm, killswitch
 from agent.safety.allowlist import is_allowed
+from agent.safety.rate_limit import RateLimiter, sanitize_command
 from agent.schemas import Action, ActionKind, ActionResult, ScreenState
-from agent.tools import hypr, screen, terminal
+from agent.tools import filesystem, hypr, screen, terminal
 from agent.tools import input as inp
 
 if TYPE_CHECKING:
@@ -27,6 +28,9 @@ log = logging.getLogger(__name__)
 
 _TERMINAL_CLASSES = {"foot", "kitty", "alacritty", "wezterm", "ghostty"}
 _CONTROL_PROCESS_MARKERS = {"codex", "claude", "agent"}
+
+_rate_limiter = RateLimiter()
+_rate_limiter_configured = False
 
 
 def _process_tree_contains(pid: int, markers: set[str]) -> bool:
@@ -95,9 +99,27 @@ async def _execute_action(
     ctx: RunContext | None,
     app_state: AppState | None = None,
 ) -> ActionResult:
+    global _rate_limiter_configured
     k = action.kind
     p = action.params
     base = ActionResult(kind=k.value)
+
+    # --- Lazy-init rate limiter from config once ---
+    if not _rate_limiter_configured and app_state is not None:
+        _rate_limiter.reconfigure(app_state.config.rate_limit)
+        _rate_limiter_configured = True
+
+    # --- Rate-limit gate ---
+    if not _rate_limiter.check(k.value):
+        log.warning("Rate-limited action: %s", k.value)
+        return ActionResult(kind=k.value, blocked="rate_limited")
+
+    # --- Command sanitization for terminal commands ---
+    if k == ActionKind.terminal_command:
+        safe, reason = sanitize_command(p["command"])
+        if not safe:
+            log.warning("Blocked unsafe command: %s (%s)", p["command"], reason)
+            return ActionResult(kind=k.value, blocked=f"unsafe_command: {reason}")
 
     if k == ActionKind.screenshot:
         return base  # brain handles its own screenshotting
@@ -105,18 +127,25 @@ async def _execute_action(
     if k == ActionKind.terminal_command:
         run_id = ctx.run_id if ctx is not None else "local"
         visible = bool(p.get("visible", True))
-        code, stdout, stderr = await terminal.run_command(
+        capture_cap = (
+            app_state.config.terminal.capture_cap_kb * 1024 if app_state is not None else 8192
+        )
+        code, stdout, stderr, total_bytes = await terminal.run_command(
             p["command"],
             run_id=run_id,
             emit=ctx.emit if ctx else None,
             hold_s=float(p.get("hold_s", 0)),
             visible=visible,
+            capture_cap=capture_cap,
+            stdin=p.get("stdin"),
         )
+        truncated = total_bytes > capture_cap if not visible else False
         return ActionResult(
             kind=k.value,
             returncode=code,
             stdout=stdout or None,
             stderr=stderr or None,
+            truncated=truncated or None,
         )
 
     if k == ActionKind.type_text:
@@ -157,7 +186,41 @@ async def _execute_action(
         response = await hypr.dispatch(cmd)
         return ActionResult(kind=k.value, dispatch_response=response)
 
-    if k in (ActionKind.notify, ActionKind.update_status):
+    if k == ActionKind.read_file:
+        try:
+            content = await filesystem.read_file(
+                p["path"],
+                offset=int(p.get("offset", 0)),
+                limit=int(p.get("limit", 0)),
+            )
+            return ActionResult(kind=k.value, stdout=content)
+        except (FileNotFoundError, PermissionError, NotADirectoryError) as exc:
+            return ActionResult(kind=k.value, blocked=str(exc))
+
+    if k == ActionKind.write_file:
+        path = p["path"]
+        target = Path(path).expanduser().resolve()
+        if target.exists() and not p.get("append", False):
+            ok = await confirm.confirm(f"Overwrite file: {path}")
+            if not ok:
+                return ActionResult(kind=k.value, rejected=path)
+        try:
+            await filesystem.write_file(path, p["content"], append=bool(p.get("append", False)))
+            return ActionResult(kind=k.value)
+        except PermissionError as exc:
+            return ActionResult(kind=k.value, blocked=str(exc))
+
+    if k == ActionKind.list_dir:
+        try:
+            listing = await filesystem.list_dir(
+                p["path"],
+                recursive=bool(p.get("recursive", False)),
+            )
+            return ActionResult(kind=k.value, stdout=listing)
+        except (NotADirectoryError, PermissionError, FileNotFoundError) as exc:
+            return ActionResult(kind=k.value, blocked=str(exc))
+
+    if k in (ActionKind.notify, ActionKind.update_status, ActionKind.speak):
         if app_state is not None:
             result = await app_state.integrations.handle(action)
             if result is not None:

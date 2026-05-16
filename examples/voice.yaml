@@ -1,0 +1,55 @@
+# voice.yaml — hyprland-agent voice subsystem.
+# Copy to ~/.config/hyprland-agent/voice.yaml and edit.
+
+tts:
+  engine: piper                        # TTS engine (only piper)
+  voice: it_IT-paola-medium            # Piper voice name
+  speed: 1.0                           # Playback speed (reserved)
+
+audio:
+  output_device: default               # PipeWire sink (reserved)
+  sample_rate: 22050                   # Piper output sample rate
+
+stt:
+  engine: faster-whisper               # STT engine (only faster-whisper)
+  model: tiny                          # tiny | base | small | medium | large
+  language:                            # Language code (null = auto-detect)
+  device: auto                         # auto | cpu | cuda
+  compute_type: default                # default | float16 | int8_float16
+
+ptt:
+  enabled: false                       # Enable PTT Unix socket listener
+  # socket: /run/user/1000/hyprland-agent-voice-ptt.sock  # (auto: $XDG_RUNTIME_DIR/...)
+  record_timeout: 10.0                 # Max recording duration (seconds)
+  silence_seconds: 1.5                 # Silence before auto-stop
+  brain: auto                          # Brain to use for submitted tasks
+
+wakeword:
+  engine: openwakeword                 # openWakeWord (M4)
+  model: hey_computer                  # Pre-built model name
+  sensitivity: 0.5                     # Detection threshold (0-1)
+  wake_words:                          # Wake word(s) to listen for
+    - computer
+
+vad:
+  engine: silero                       # Silero VAD (M4)
+  threshold: 0.5                       # Speech probability threshold (0-1)
+  min_speech_duration_ms: 250          # Minimum speech to avoid noise triggers
+
+handsfree:
+  enabled: false                       # Enable hands-free wake-word + VAD (M4)
+  record_timeout: 10.0                 # Max recording duration (seconds)
+  brain: auto                          # Brain to use for submitted tasks
+
+templates:
+  run_started: "Avvio: {task}"         # Announced when a task starts
+  run_completed: "Fatto"               # Announced on success
+  run_errored: "Errore: {error_short}" # Announced on error
+  run_aborted: "Annullato"             # Announced on cancellation
+
+privacy:
+  redact_patterns:                     # Key names whose values are redacted
+    - token
+    - secret
+    - password
+    - api[_-]?key

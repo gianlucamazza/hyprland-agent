@@ -29,6 +29,14 @@ class TestIsDestructiveDispatch:
         assert "killactive" in _DESTRUCTIVE_DISPATCH
         assert "closewindow" in _DESTRUCTIVE_DISPATCH
         assert "exit" in _DESTRUCTIVE_DISPATCH
+        assert "forcerendererreload" in _DESTRUCTIVE_DISPATCH
+        # All entries in the set must be covered above
+        assert {
+            "killactive",
+            "closewindow",
+            "exit",
+            "forcerendererreload",
+        } == _DESTRUCTIVE_DISPATCH
 
 
 class TestConfirm:

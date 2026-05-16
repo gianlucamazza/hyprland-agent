@@ -35,18 +35,21 @@ agent run "<task>"
 | Module | Role |
 |--------|------|
 | `src/agent/ipc/` | Shared NDJSON wire protocol — Pydantic discriminated union, 1 MiB frame cap, protocol v1.0 |
-| `src/agent/daemon/` | `server.py` RPC dispatch, `run_executor.py` queue + timeout, `watcher_service.py` Hyprland event fan-out, `pubsub.py` internal topic bus, `store.py` SQLite RunStore (schema v4), `rule_runner.py` watcher rules |
+| `src/agent/daemon/` | `server.py` RPC dispatch, `run_executor.py` queue + timeout, `watcher_service.py` Hyprland event fan-out, `pubsub.py` internal topic bus, `store.py` SQLite RunStore (schema v5), `rule_runner.py` watcher rules, `audit_log.py` run audit trail, `log_publisher.py` structured log distribution |
 | `src/agent/client/` | Async RPC client; used by CLI and TUI |
 | `src/agent/brain/` | LLM providers + `router.py` + Anthropic SDK client (`anthropic_client.py`); `context.py` assembles `BrainContext` injected into every LLM call |
 | `src/agent/tools/` | Hyprland native IPC (not `hyprctl`), screen capture, keyboard (`wtype`), mouse (`ydotool`), clipboard, events |
-| `src/agent/safety/` | `allowlist.py` deny-by-default + miss counter, `confirm.py` gate, `killswitch.py` STOP flag (edge-triggered) |
+| `src/agent/safety/` | `allowlist.py` deny-by-default + miss counter, `confirm.py` gate, `killswitch.py` STOP flag (edge-triggered), `rate_limit.py` per-action-type rate limiter + command sanitizer |
 | `src/agent/tui/` | Textual monitoring TUI; `widgets/learning_pane.py` is the Ctrl+I Learning Inbox |
 | `src/agent/schemas.py` | All Pydantic models: `Action`, `ScreenState`, `RunSummary`, `ActionResult`, … |
 | `src/agent/awareness/` | `WorkingMemory` (per-run action log), `WorldSnapshot` (active windows + focused), `meta_cognition.py` (loop detection + post-action visual verify) |
 | `src/agent/introspection/` | `SelfModel` — capabilities, constraints, version string exposed to the brain |
-| `src/agent/memory/` | `FastEmbedder` (intfloat/multilingual-e5-large, lazy ONNX singleton), `EpisodicMemory` (ingest + cosine recall), `EpisodicIngestor` |
-| `src/agent/learning/` | `LearningConsumer`, `ReflectionEngine`, `SkillLibrary`, `RuleMiner`, `AllowlistMiner`, `api.py` (proposals CRUD + approval side-effects) |
-| `src/agent/integrations/` | `IntegrationRegistry`, `CapabilitySpec`, built-in Mako / Waybar / Fuzzel / Idle integrations |
+| `src/agent/memory/` | `FastEmbedder` (intfloat/multilingual-e5-large, lazy ONNX singleton), `EpisodicMemory` (ingest + cosine recall) |
+| `src/agent/learning/` | `LearningConsumer`, `ReflectionEngine`, `SkillLibrary`, `RuleMiner`, `AllowlistMiner`, `api.py` (proposals CRUD + approval side-effects), `outcome.py` (feedback→outcome derivation) |
+| `src/agent/integrations/` | `IntegrationRegistry`, `CapabilitySpec`, built-in Mako / Waybar / Fuzzel / Idle / Voice integrations |
+| `src/agent/voice/` | Voice I/O sidecar engines: Piper TTS, faster-whisper STT, openWakeWord, Silero VAD, ring buffer, redaction, audio pipeline |
+| `src/agent/diagnostics.py` | Health checks for `agent doctor` (binaries, sockets, credentials, connectivity) |
+| `src/agent/paths.py` | Shared path helpers (`CONFIG_DIR`, `CACHE_DIR`, `SOCKET_PATH`, …) |
 
 ---
 
@@ -91,6 +94,7 @@ All migrations are applied in sequence by `_init_db` in `daemon/store.py`.
 | v2 | `outcomes`, `feedback`, `action_outcomes` |
 | v3 | `episodes`, `episode_vecs` (vec0), `reflections` |
 | v4 | `skills`, `skill_vecs`, `skill_outcomes`, `learned_rules`, `allowlist_proposals` |
+| v5 | Adds `decay_score REAL DEFAULT 1.0` and `last_accessed_at REAL` columns to `episodes`, `reflections`, `skills` (memory decay) |
 
 ---
 
@@ -140,14 +144,16 @@ Third-party packages register integrations via the entry-points group
 | `integrations/waybar.py` | `WaybarIntegration` | Status module for Waybar |
 | `integrations/fuzzel.py` | `FuzzelIntegration` | Task launcher via fuzzel dmenu |
 | `integrations/idle.py` | `IdleIntegration` | Cancel active runs on screen lock (D-Bus) |
+| `integrations/voice.py` | `VoiceIntegration` | Wires `ActionKind.speak`, publishes `Topic.voice` state |
 
 `IntegrationRegistry` discovers integrations at daemon startup, calls `setup()`,
 and routes `ActionKind.notify` / `ActionKind.update_status` to all registered
 handlers. Schema version `INTEGRATIONS_API_VERSION = "1.0"` — major-version
 mismatch causes the integration to be skipped.
 
-Console scripts: `agent-waybar` (`cli/waybar_module.py`) and `fuzzel-agent`
-(`cli/fuzzel_launcher.py`) are thin async RPC clients over the daemon socket.
+Console scripts: `agent-waybar` (`cli/waybar_module.py`), `fuzzel-agent`
+(`cli/fuzzel_launcher.py`), and `agent-voice` (`cli/voice_sidecar.py`) are thin
+async RPC clients over the daemon socket.
 
 **Desktop launcher**: the AUR package installs
 `packaging/desktop/hyprland-agent-tui.desktop` to `/usr/share/applications/`.
@@ -166,8 +172,73 @@ by class. Requires `foot` (listed as `optdepend`).
 | `~/.config/hyprland-agent/learned_rules.yaml` | Approved learned rules |
 | `~/.config/hyprland-agent/config.yaml` | Provider enablement, memory/learning knobs |
 | `~/.config/hyprland-agent/env` | Provider API keys (read only by daemon) |
-| `~/.cache/hyprland-agent/runs.db` | SQLite WAL run store (schema v4) |
+| `~/.cache/hyprland-agent/runs.db` | SQLite WAL run store (schema v5) |
 | `~/.cache/hyprland-agent/STOP` | Killswitch flag file |
+| `~/.cache/hyprland-agent/voice/` | STT / TTS / wake-word model cache |
+| `$XDG_RUNTIME_DIR/hyprland-agent-voice.sock` | Voice sidecar PTT socket |
+| `$XDG_RUNTIME_DIR/hyprland-agent-voice.muted` | Mute flag for voice capture |
 | `~/.cache/fastembed/` | Embedder model cache (~1.3 GB after first use) |
 | `$XDG_RUNTIME_DIR/hyprland-agent.sock` | Daemon RPC socket (mode 0600) |
 | `~/.config/systemd/user/hyprland-agent.service` | Systemd user unit |
+| `~/.config/hyprland-agent/voice.yaml` | Voice subsystem config (STT/TTS/wake/VAD) |
+
+---
+
+## Voice subsystem
+
+Voice adds an optional speech I/O channel via a **sidecar** architecture:
+
+```
+agent-voice                           (src/agent/cli/voice_sidecar.py)
+  │  ┌──────────────────────────┐
+  │  │ AudioSource (sounddevice) │ ← PipeWire input @ 16 kHz mono
+  │  │ AudioSink   (sounddevice) │ → PipeWire output
+  │  └──────────┬───────────────┘
+  │             │ ring buffer (1.5 s pre-wake)
+  │  ┌──────────▼───────────────┐
+  │  │ WakeEngine (openWakeWord)│   IDLE ──► ARMED ──► CAPTURING
+  │  │ VadEngine (Silero VAD)   │     ▲                       │
+  │  │ SttEngine (faster-whisper)│   │    endpoint (700 ms)    │
+  │  │ TtsEngine (Piper)        │   ◄──────── TRANSCRIBING    │
+  │  └──────────────────────────┘              │
+  │         │ RPC (run_task / cancel_run)      ▼
+  │         └─────────────────────► daemon  SUBMITTING
+  │                                              │
+  │         ◄────────── Topic.runs ──────────────┘
+  │                    run_started → TTS "Avvio: …"
+  │                    run_done    → TTS "Fatto"
+  │                    run_error   → TTS "Errore: …"
+  │
+  └──────────────────────────────────────────────────
+         PTT socket: $XDG_RUNTIME_DIR/hyprland-agent-voice.sock
+         Mute flag:  $XDG_RUNTIME_DIR/hyprland-agent-voice.muted
+```
+
+**Architecture boundary** — hybrid:
+- **`agent-voice` sidecar** (`src/agent/cli/voice_sidecar.py`): owns audio I/O, ML engines, FSM, barge-in. Heavy deps isolated here.
+- **`VoiceIntegration`** (`src/agent/integrations/voice.py`): thin daemon-integrated class. Registers `ActionKind.speak`, publishes `Topic.voice` state, wires killswitch pause.
+
+**FSM states**: `IDLE → ARMED → CAPTURING → TRANSCRIBING → SUBMITTING → LISTENING_EVENTS → SPEAKING → IDLE`
+
+**Engine protocol** — each engine implements a Protocol in `src/agent/voice/engines/__init__.py`. Built-in engines loaded via `hyprland_agent.voice.*` entry points, mirroring the integration registry pattern.
+
+**Privacy**:
+- Audio never crosses IPC; only transcribed text reaches the daemon via `RpcMethod.run_task`.
+- Mute flag checked at every wake; killswitch arms → sidecar closes PipeWire input.
+- Transcript opt-in (`voice.privacy.log_transcripts`), stored `0600` with TTL rotation.
+- Pre-TTS redaction (`src/agent/voice/redact.py`) replaces tokens/secrets/paths with `[REDACTED]`.
+- Cloud engines blocked by default (`voice.privacy.allow_cloud_engines: false`).
+
+**Configuration** — two-tier: `config.yaml` holds `integrations.voice.enabled: bool`; full voice config lives in `~/.config/hyprland-agent/voice.yaml`.
+
+**Roadmap** (M1 = current skeleton):
+| Milestone | Deliverable |
+|-----------|-------------|
+| M1 skeleton | VoiceIntegration, Topic.voice, ActionKind.speak, voice config, sidecar entry point |
+| M2 TTS-only | Piper, subscribe Topic.runs, template + redact, mute file |
+| M3 STT+PTT | PTT socket, faster-whisper, submit. Hyprland hotkey documented |
+| M4 wake-word+VAD+barge-in | openWakeWord, Silero VAD, ring buffer, barge-in |
+| M5 packaging | AUR split package, systemd unit |
+| M6 polish | Cloud engine opt-in, Parakeet TDT v3, Kokoro TTS |
+
+The engine abstraction lets each piece land independently. After M2 the sidecar is already useful for accessibility (TTS feedback on run completion).

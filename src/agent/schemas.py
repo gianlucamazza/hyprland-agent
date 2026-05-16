@@ -85,9 +85,13 @@ class ActionKind(StrEnum):
     scroll = "scroll"
     focus_window = "focus_window"
     dispatch = "dispatch"
+    read_file = "read_file"
+    write_file = "write_file"
+    list_dir = "list_dir"
     # Integration-provided kinds
     notify = "notify"
     update_status = "update_status"
+    speak = "speak"
 
 
 class Action(BaseModel):
@@ -192,6 +196,7 @@ class ActionResult(BaseModel):
     returncode: int | None = None
     blocked: str | None = None
     rejected: str | None = None
+    truncated: bool | None = None
     pre_hash: str | None = None
     post_hash: str | None = None
 

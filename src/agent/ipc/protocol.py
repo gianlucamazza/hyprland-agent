@@ -36,6 +36,7 @@ class Topic(StrEnum):
     runs = "runs"
     hypr_events = "hypr_events"
     logs = "logs"
+    voice = "voice"
 
 
 class _StrictFrame(BaseModel):

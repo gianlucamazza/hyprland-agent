@@ -63,12 +63,38 @@ class MemoryConfig:
 
 
 @dataclass(frozen=True)
+class DecayConfig:
+    enabled: bool = True
+    half_life_days: int = 90
+    prune_threshold: float = 0.1
+    cleanup_interval_s: int = 3600
+
+
+@dataclass(frozen=True)
 class LearningConfig:
     enabled: bool = True
     mining_interval_s: int = 300
     skill_extraction_enabled: bool = True
     rule_mining_enabled: bool = True
     allowlist_mining_enabled: bool = True
+    decay: DecayConfig = field(default_factory=DecayConfig)
+
+
+@dataclass(frozen=True)
+class RateLimitConfig:
+    gui_actions_per_minute: int = 30
+    terminal_commands_per_minute: int = 10
+    other_actions_per_minute: int = 60
+
+
+@dataclass(frozen=True)
+class TerminalConfig:
+    capture_cap_kb: int = 64  # 64KB default (up from 8KB)
+
+
+@dataclass(frozen=True)
+class VoiceCoreConfig:
+    enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -76,6 +102,13 @@ class IntegrationsConfig:
     enabled: tuple[str, ...] = ()  # empty = load all discovered
     binary_overrides: dict[str, str] = field(default_factory=dict)
     mako_app_name: str = "hyprland-agent"
+    voice: VoiceCoreConfig = field(default_factory=VoiceCoreConfig)
+
+
+@dataclass(frozen=True)
+class ContextConfig:
+    budget_tokens: int = 160_000  # 80% of typical 200K window
+    keep_rounds: int = 3
 
 
 @dataclass(frozen=True)
@@ -83,7 +116,10 @@ class AgentConfig:
     brain: BrainConfig = field(default_factory=BrainConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
     learning: LearningConfig = field(default_factory=LearningConfig)
+    rate_limit: RateLimitConfig = field(default_factory=RateLimitConfig)
+    terminal: TerminalConfig = field(default_factory=TerminalConfig)
     integrations: IntegrationsConfig = field(default_factory=IntegrationsConfig)
+    context: ContextConfig = field(default_factory=ContextConfig)
     audit_log: bool = False
     path: Path = CONFIG_PATH
 
@@ -156,6 +192,18 @@ def _memory_config(data: dict[str, Any]) -> MemoryConfig:
     )
 
 
+def _decay_config(raw_parent: dict[str, Any]) -> DecayConfig:
+    raw = raw_parent.get("decay", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("learning.decay must be a mapping")
+    return DecayConfig(
+        enabled=bool(raw.get("enabled", True)),
+        half_life_days=int(raw.get("half_life_days", 90)),
+        prune_threshold=float(raw.get("prune_threshold", 0.1)),
+        cleanup_interval_s=int(raw.get("cleanup_interval_s", 3600)),
+    )
+
+
 def _learning_config(data: dict[str, Any]) -> LearningConfig:
     raw = data.get("learning", {}) or {}
     if not isinstance(raw, dict):
@@ -166,6 +214,27 @@ def _learning_config(data: dict[str, Any]) -> LearningConfig:
         skill_extraction_enabled=bool(raw.get("skill_extraction_enabled", True)),
         rule_mining_enabled=bool(raw.get("rule_mining_enabled", True)),
         allowlist_mining_enabled=bool(raw.get("allowlist_mining_enabled", True)),
+        decay=_decay_config(raw),
+    )
+
+
+def _rate_limit_config(data: dict[str, Any]) -> RateLimitConfig:
+    raw = data.get("rate_limit", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("rate_limit must be a mapping")
+    return RateLimitConfig(
+        gui_actions_per_minute=int(raw.get("gui_actions_per_minute", 30)),
+        terminal_commands_per_minute=int(raw.get("terminal_commands_per_minute", 10)),
+        other_actions_per_minute=int(raw.get("other_actions_per_minute", 60)),
+    )
+
+
+def _terminal_config(data: dict[str, Any]) -> TerminalConfig:
+    raw = data.get("terminal", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("terminal must be a mapping")
+    return TerminalConfig(
+        capture_cap_kb=int(raw.get("capture_cap_kb", 64)),
     )
 
 
@@ -173,7 +242,7 @@ def _integrations_config(data: dict[str, Any]) -> IntegrationsConfig:
     raw = data.get("integrations", {}) or {}
     if not isinstance(raw, dict):
         raise ConfigError("integrations must be a mapping")
-    known_keys = {"enabled", "binary_overrides", "mako_app_name"}
+    known_keys = {"enabled", "binary_overrides", "mako_app_name", "voice"}
     for key in raw:
         if key not in known_keys:
             raise ConfigError(f"integrations.{key!r} is not a recognised key")
@@ -189,10 +258,25 @@ def _integrations_config(data: dict[str, Any]) -> IntegrationsConfig:
     binary_overrides = {str(k): str(v) for k, v in raw_overrides.items()}
 
     mako_app_name = str(raw.get("mako_app_name", "hyprland-agent"))
+    raw_voice = raw.get("voice", {}) or {}
+    if not isinstance(raw_voice, dict):
+        raise ConfigError("integrations.voice must be a mapping")
+    voice_enabled = bool(raw_voice.get("enabled", False))
     return IntegrationsConfig(
         enabled=enabled,
         binary_overrides=binary_overrides,
         mako_app_name=mako_app_name,
+        voice=VoiceCoreConfig(enabled=voice_enabled),
+    )
+
+
+def _context_config(data: dict[str, Any]) -> ContextConfig:
+    raw = data.get("context", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("context must be a mapping")
+    return ContextConfig(
+        budget_tokens=int(raw.get("budget_tokens", 160_000)),
+        keep_rounds=int(raw.get("keep_rounds", 3)),
     )
 
 
@@ -205,7 +289,10 @@ def load_config(path: Path = CONFIG_PATH) -> AgentConfig:
         brain=_brain_config(data),
         memory=_memory_config(data),
         learning=_learning_config(data),
+        rate_limit=_rate_limit_config(data),
+        terminal=_terminal_config(data),
         integrations=_integrations_config(data),
+        context=_context_config(data),
         audit_log=audit_log,
         path=path,
     )

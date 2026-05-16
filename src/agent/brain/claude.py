@@ -7,7 +7,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from agent.brain._action_map import computer_actions
-from agent.brain._common import MAX_LOOP, SCALE, png_b64
+from agent.brain._common import MAX_LOOP, SCALE, compact_messages, png_b64
 from agent.brain.anthropic_client import anthropic_client
 from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
@@ -77,6 +77,47 @@ _CUSTOM_TOOLS: list[dict[str, Any]] = [
             "required": ["cmd"],
         },
     },
+    {
+        "name": "read_file",
+        "description": "Read a file's contents. Returns text up to 64KB. Use offset/limit for large files.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "File path (supports ~/)"},
+                "offset": {
+                    "type": "integer",
+                    "description": "Start reading from this character offset",
+                },
+                "limit": {"type": "integer", "description": "Max characters to read"},
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "write_file",
+        "description": "Write content to a file. Creates parent directories. Asks confirmation before overwriting.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "File path (supports ~/)"},
+                "content": {"type": "string", "description": "Content to write"},
+                "append": {"type": "boolean", "description": "Append instead of overwrite"},
+            },
+            "required": ["path", "content"],
+        },
+    },
+    {
+        "name": "list_dir",
+        "description": "List directory contents as JSON with file sizes. Set recursive=true for subdirectories.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Directory path (supports ~/)"},
+                "recursive": {"type": "boolean", "description": "Include subdirectories"},
+            },
+            "required": ["path"],
+        },
+    },
 ]
 
 
@@ -112,6 +153,12 @@ async def _handle_custom(name: str, inp: dict[str, Any]) -> tuple[str, list[Acti
         ]
     if name == "dispatch_hypr":
         return "dispatch queued", [Action(kind=ActionKind.dispatch, params={"cmd": inp["cmd"]})]
+    if name == "read_file":
+        return "Reading file...", [Action(kind=ActionKind.read_file, params=inp)]
+    if name == "write_file":
+        return "Writing file...", [Action(kind=ActionKind.write_file, params=inp)]
+    if name == "list_dir":
+        return "Listing directory...", [Action(kind=ActionKind.list_dir, params=inp)]
     return "unknown tool", []
 
 
@@ -170,7 +217,16 @@ class ClaudeBrain:
         tools = [_computer_tool(scaled_w, scaled_h)] + _CUSTOM_TOOLS
         all_actions: list[Action] = []
 
+        from agent.config import load_config as _load_cfg
+
+        ctx_cfg = _load_cfg().context
+
         for _iteration in range(_MAX_LOOP):
+            messages = compact_messages(
+                messages,
+                budget_tokens=ctx_cfg.budget_tokens,
+                keep_rounds=ctx_cfg.keep_rounds,
+            )
             response = await asyncio.to_thread(
                 client.messages.create,
                 model=self.model,

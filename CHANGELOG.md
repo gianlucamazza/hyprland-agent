@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-05-16
+
+### Added
+
+- Memory decay — SQLite schema v5 adds `decay_score` and `last_accessed_at`
+  columns to `episodes`, `reflections`, `skills`. Exponential decay formula
+  (`POW(0.5, elapsed / half_life)`) with configurable half-life (default 90 d)
+  and prune threshold (default 0.1). `touch_memory()` resets score on recall.
+  Background cleanup task in daemon runs every `cleanup_interval_s` (default 1 h).
+- Rate limiter (`src/agent/safety/rate_limit.py`) — per-action-type token bucket:
+  GUI 30/min, terminal 10/min, other 60/min. Lazy-initialized from
+  `config.rate_limit` with live `reconfigure()`. `sanitize_command()` blocks
+  `rm -f /`, `mkfs`, `dd ` writing to `/dev/`, piping to `agent`, and
+  backgrounding (`&`).
+- Learning pipeline mining — `AllowlistMiner` and `RuleMiner` integrated into
+  `LearningConsumer` as periodic tasks (default 300 s interval). Gated by
+  `config.learning.{allowlist_mining_enabled,rule_mining_enabled}`.
+- Voice subsystem (M1 skeleton) — `VoiceIntegration`, `Topic.voice`,
+  `ActionKind.speak` routing in the orchestrator, `agent-voice` sidecar entry
+  point (`cli/voice_sidecar.py`), Piper TTS engine, faster-whisper STT,
+  openWakeWord + Silero VAD wake-word pipeline, ring buffer, voice config
+  (`voice.yaml`), and PTT Unix socket.
+- Filesystem tool (`src/agent/tools/filesystem.py`) — `read_file`, `write_file`,
+  `list_dir` with HOME-scoped path validation and symlink safety.
+- `config.rate_limit` and `config.context` configuration sections for rate
+  limiting and context budget/compaction tuning (`budget_tokens=160000`,
+  `keep_rounds=3`).
+- `config.terminal.capture_cap_kb` — configurable terminal capture cap (default 64 KB).
+- Context compaction (`brain/_common.py:compact_messages`) — token budget-aware
+  message trimming that keeps system prompt + last N rounds.
+- `ActionContext.rate_limited` and `ActionContext.unsafe_command` result types.
+- Safety integration tests — `is_binary_allowed()` coverage (default set, YAML
+  override, missing file, null YAML), orchestrator rate-limit and unsafe-command
+  integration paths.
+
+### Changed
+
+- `LearningConfig` — split `decay: DecayConfig` subsection. Existing
+  `config.yaml` files are backward-compatible (defaults apply).
+- `RateLimiter.from_config()` / `reconfigure()` for config-driven lazy init.
+- Wire `ActionKind.speak` through `IntegrationRegistry.handle()` in
+  orchestrator.
+- `_DESTRUCTIVE_DISPATCH` — added `forcerendererreload` to the set.
+- `tools/terminal.py` — `capture_cap` respects `config.terminal.capture_cap_kb`.
+- Standardised `with` statements, `contextlib.suppress` patterns, and import
+  sorting across voice and test modules (ruff SIM105, SIM114, SIM117).
+
+### Fixed
+
+- Docs drift: schema v4→v5 in `architecture.md` and `CLAUDE.md`; added missing
+  module entries (`voice/`, `rate_limit.py`, `diagnostics.py`, `paths.py`,
+  `audit_log.py`, `log_publisher.py`); removed brittle pyproject.toml line
+  number references in `CLAUDE.md`; documented memory decay, rate limiter,
+  and learning pipeline gotchas.
+- `_action_map.py` — consolidated duplicate `image`/`image_url` branches.
+- `agent.voice.ptt` — fixed `SttEngine` import path (was importing from
+  `agent.voice.stt` instead of `agent.voice.engines`).
+- `agent.voice.audio` — type-safe stream access in capture loop.
+- `agent.voice.engines.piper` — mypy `wait_for` type ignore.
+- Various unused imports and type annotation issues in tests.
+
 ## [1.3.0] - 2026-05-16
 
 ### Added

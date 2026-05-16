@@ -1,0 +1,25 @@
+// Waybar custom module for hyprland-agent with voice controls.
+// Place in ~/.config/waybar/config under the "modules-right" (or left/center) array.
+//
+// Click behaviour:
+//   left click  → toggle voice mute/unmute
+//   right click → show voice status
+//
+// Requires: agent-voice (sidecar) installed alongside agent.
+
+{
+    "custom/hyprland-agent": {
+        "exec": "agent-waybar",
+        "return-type": "json",
+        "on-click": "agent voice toggle-mute",
+        "on-click-right": "agent voice status",
+        "format": "{icon}{}",
+        "format-icons": {
+            "idle": "○ ",
+            "running": "● ",
+            "done": "✓ ",
+            "error": "✗ ",
+            "disconnected": "⊘ "
+        }
+    }
+}
