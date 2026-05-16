@@ -120,14 +120,14 @@ def cmd_doctor(
     json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Check prerequisites and configuration."""
-    from agent.diagnostics import run_all
+    from agent.diagnostics import Status, run_all
 
     checks = run_all()
     if json_out:
         import json
 
         typer.echo(json.dumps([c.__dict__ for c in checks], default=str))
-        all_ok = all(c.ok for c in checks)
+        all_ok = all(c.status == Status.ok for c in checks)
         raise typer.Exit(ExitCode.ok if all_ok else ExitCode.error)
     from agent.diagnostics import print_report
 

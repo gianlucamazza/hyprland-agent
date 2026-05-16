@@ -7,7 +7,7 @@ import base64
 import os
 from typing import TYPE_CHECKING, Any
 
-from agent.brain.oauth_bridge import anthropic_client
+from agent.brain.anthropic_client import anthropic_client
 from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
 

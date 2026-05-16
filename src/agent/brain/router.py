@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from agent.brain.base import Brain
 from agent.config import (
@@ -27,17 +26,15 @@ def canonical_provider(name: str) -> str:
     return provider
 
 
-def _claude_credentials_available() -> bool:
-    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "").strip():
-        return True
-    return (Path.home() / ".claude" / ".credentials.json").exists()
+def _anthropic_api_key_available() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
 
 
 def _provider_available(provider: str) -> tuple[bool, str]:
     if provider == "claude":
-        if _claude_credentials_available():
+        if _anthropic_api_key_available():
             return True, "available"
-        return False, "Claude OAuth credentials not found"
+        return False, "ANTHROPIC_API_KEY not set"
 
     from agent.brain.openai_brain import PROVIDERS
 

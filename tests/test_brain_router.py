@@ -52,7 +52,7 @@ def test_claude_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
     from agent.brain.claude import ClaudeBrain
 
     _use_config(monkeypatch, _config())
-    monkeypatch.setattr("agent.brain.router._claude_credentials_available", lambda: True)
+    monkeypatch.setattr("agent.brain.router._anthropic_api_key_available", lambda: True)
     brain = get_brain("claude")
     assert isinstance(brain, ClaudeBrain)
 
@@ -72,7 +72,7 @@ def test_auto_falls_back_to_claude_when_no_provider(
     from agent.brain.claude import ClaudeBrain
 
     _use_config(monkeypatch, _config())
-    monkeypatch.setattr("agent.brain.router._claude_credentials_available", lambda: True)
+    monkeypatch.setattr("agent.brain.router._anthropic_api_key_available", lambda: True)
     _clear_provider_keys(monkeypatch)
     brain = get_brain("auto")
     assert isinstance(brain, ClaudeBrain)
@@ -84,7 +84,7 @@ def test_none_falls_back_to_claude_when_no_provider(
     from agent.brain.claude import ClaudeBrain
 
     _use_config(monkeypatch, _config())
-    monkeypatch.setattr("agent.brain.router._claude_credentials_available", lambda: True)
+    monkeypatch.setattr("agent.brain.router._anthropic_api_key_available", lambda: True)
     _clear_provider_keys(monkeypatch)
     brain = get_brain(None)
     assert isinstance(brain, ClaudeBrain)
@@ -148,7 +148,7 @@ def test_claude_model_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     from agent.brain.claude import ClaudeBrain
 
     _use_config(monkeypatch, _config())
-    monkeypatch.setattr("agent.brain.router._claude_credentials_available", lambda: True)
+    monkeypatch.setattr("agent.brain.router._anthropic_api_key_available", lambda: True)
     monkeypatch.setenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     brain = get_brain("claude")
     assert isinstance(brain, ClaudeBrain)

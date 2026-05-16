@@ -12,7 +12,7 @@ Read `README.md` for prerequisites, setup, and user-facing docs. This file cover
 
 ```bash
 uv sync                      # install deps (Python >= 3.13, managed via uv)
-uv run pytest                # full test suite (338 tests)
+uv run pytest                # full test suite (396 tests)
 uv run pytest -m "not slow"  # fast suite (skips embedder download)
 uv run pytest tests/test_orchestrator.py::test_name   # single test
 uv run agent service start -v  # run daemon in foreground
@@ -55,7 +55,7 @@ agent run "<task>"
 - `src/agent/ipc/` — shared NDJSON wire protocol (Pydantic discriminated union, 1 MiB frame cap)
 - `src/agent/daemon/` — server, run_executor, watcher_service, pubsub, SQLite RunStore (v4), rule_runner
 - `src/agent/client/` — async RPC client
-- `src/agent/brain/` — LLM providers + router + Claude Code OAuth bridge; `brain/context.py` assembles `BrainContext` injected into every LLM call
+- `src/agent/brain/` — LLM providers + router + Anthropic SDK client (`brain/anthropic_client.py`); `brain/context.py` assembles `BrainContext` injected into every LLM call
 - `src/agent/tools/` — Hyprland IPC (native socket, not `hyprctl` subprocess), screen capture, input, clipboard, events
 - `src/agent/safety/` — allowlist (deny-by-default + miss counter), confirmation gate, killswitch
 - `src/agent/tui/` — Textual monitoring TUI; `widgets/learning_pane.py` is the Ctrl+I learning inbox
@@ -70,7 +70,7 @@ agent run "<task>"
 
 `brain/router.py` resolves `--brain <name>` (or RPC param) to an implementation. Six OpenAI-compatible providers (openai, moonshot, groq, together, zai, qwen) share a single `OpenAICompatibleBrain` class differing only in `base_url` and env-var names — see the `PROVIDERS` registry in `brain/openai_brain.py`. Claude uses its own `ClaudeBrain` with the native `computer_20251124` tool plus custom `list_windows`, `focus_window`, `dispatch_hypr` tools.
 
-**`--brain auto`** reads `~/.config/hyprland-agent/config.yaml`: `brain.auto_order` controls priority, and `brain.providers.<name>.enabled` controls whether a provider can be selected. This is the operational switch for disabling Anthropic/Claude and using OpenAI when credits or OAuth are unavailable.
+**`--brain auto`** reads `~/.config/hyprland-agent/config.yaml`: `brain.auto_order` controls priority, and `brain.providers.<name>.enabled` controls whether a provider can be selected. This is the operational switch for disabling Anthropic/Claude and using OpenAI when credits or API key are unavailable.
 
 Provider keys are read **only by the daemon process** and never cross the IPC socket. Clients see run IDs and events, not credentials.
 
@@ -171,4 +171,4 @@ Entry-points group `hyprland_agent.integrations` — third-party packages can re
 
 ## Known test state
 
-`uv run pytest` → 338 passed. `uv run pytest -m "not slow"` skips embedder download tests. The Textual error-screen snapshot is tracked; inspect `snapshot_report.html` before intentionally updating it after TUI rendering changes.
+`uv run pytest` → 396 passed. `uv run pytest -m "not slow"` skips embedder download tests. The Textual error-screen snapshot is tracked; inspect `snapshot_report.html` before intentionally updating it after TUI rendering changes.

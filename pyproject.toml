@@ -88,6 +88,7 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
 markers = ["slow: tests that download external models or hit the network"]
 
 [tool.coverage.run]

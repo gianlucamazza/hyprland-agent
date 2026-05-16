@@ -37,7 +37,7 @@ agent run "<task>"
 | `src/agent/ipc/` | Shared NDJSON wire protocol — Pydantic discriminated union, 1 MiB frame cap, protocol v1.0 |
 | `src/agent/daemon/` | `server.py` RPC dispatch, `run_executor.py` queue + timeout, `watcher_service.py` Hyprland event fan-out, `pubsub.py` internal topic bus, `store.py` SQLite RunStore (schema v4), `rule_runner.py` watcher rules |
 | `src/agent/client/` | Async RPC client; used by CLI and TUI |
-| `src/agent/brain/` | LLM providers + `router.py` + Claude Code OAuth bridge; `context.py` assembles `BrainContext` injected into every LLM call |
+| `src/agent/brain/` | LLM providers + `router.py` + Anthropic SDK client (`anthropic_client.py`); `context.py` assembles `BrainContext` injected into every LLM call |
 | `src/agent/tools/` | Hyprland native IPC (not `hyprctl`), screen capture, keyboard (`wtype`), mouse (`ydotool`), clipboard, events |
 | `src/agent/safety/` | `allowlist.py` deny-by-default + miss counter, `confirm.py` gate, `killswitch.py` STOP flag (edge-triggered) |
 | `src/agent/tui/` | Textual monitoring TUI; `widgets/learning_pane.py` is the Ctrl+I Learning Inbox |

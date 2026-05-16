@@ -18,7 +18,7 @@ On every action step, the following is transmitted to the configured LLM provide
 
 | Provider | Key env var | Data policy |
 |----------|-------------|-------------|
-| Anthropic (Claude) | `ANTHROPIC_API_KEY` or OAuth | [Anthropic Privacy Policy](https://www.anthropic.com/legal/privacy) |
+| Anthropic (Claude) | `ANTHROPIC_API_KEY` | [Anthropic Privacy Policy](https://www.anthropic.com/legal/privacy) |
 | OpenAI | `OPENAI_API_KEY` | [OpenAI Privacy Policy](https://openai.com/policies/privacy-policy) |
 | Groq | `GROQ_API_KEY` | [Groq Privacy Policy](https://groq.com/privacy-policy/) |
 | Together AI | `TOGETHER_API_KEY` | [Together Privacy Policy](https://www.together.ai/privacy) |

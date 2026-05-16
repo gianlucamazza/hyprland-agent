@@ -164,7 +164,7 @@ runtime. The source checkout remains for code, tests, and future builds only.
 The agent controls a real desktop, so provider choice is reliability-first.
 Claude is the recommended action brain when available, but every provider can
 be enabled or disabled from local config. This matters operationally: if
-Anthropic credits or OAuth are unavailable, disable Claude and let `auto` use
+Anthropic credits are unavailable, disable Claude and let `auto` use
 OpenAI or another configured provider.
 
 | Role             | Provider                      |                        Brain option | Default model       |
@@ -213,12 +213,9 @@ choices still work only when that provider is enabled in config.
 
 ## Credentials
 
-Claude uses Claude Code OAuth credentials. Supported sources are:
-
-- `CLAUDE_CODE_OAUTH_TOKEN`, for a token created by Claude Code.
-- `~/.claude/.credentials.json`, used as the fallback credential source.
-
-No `ANTHROPIC_API_KEY` is required for the Claude Code OAuth path.
+Claude uses `ANTHROPIC_API_KEY`. Set `ANTHROPIC_BASE_URL` to redirect to an
+Anthropic-compatible endpoint (e.g. `https://api.z.ai/api/anthropic` for the
+Z.AI GLM Coding Plan).
 
 Override the Claude model with:
 
@@ -593,8 +590,8 @@ uv run pytest
 Result:
 
 ```text
-338 tests collected
-338 passed
+396 tests collected
+396 passed
 ```
 
 The Textual error-screen snapshot is tracked under `tests/__snapshots__/`.

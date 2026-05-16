@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import grp
-import json
 import os
 import shutil
 import subprocess
-import time
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -154,45 +152,25 @@ def _hyprland_env() -> Check:
     )
 
 
-def _oauth_creds() -> Check:
+def _anthropic_key() -> Check:
     from agent.config import ConfigError, load_config
 
     try:
         config = load_config()
     except ConfigError:
-        return Check("Claude OAuth", Status.warn, "skipped due to invalid provider config")
+        return Check("ANTHROPIC_API_KEY", Status.warn, "skipped due to invalid provider config")
     if not config.brain.is_enabled("claude"):
-        return Check("Claude OAuth", Status.warn, "disabled by provider config")
-
-    path = Path.home() / ".claude" / ".credentials.json"
-    _, source = _env_value("CLAUDE_CODE_OAUTH_TOKEN")
-    if source:
-        return Check("Claude OAuth", Status.ok, f"CLAUDE_CODE_OAUTH_TOKEN set in {source}")
-    if not path.exists():
+        return Check("ANTHROPIC_API_KEY", Status.warn, "disabled by provider config")
+    value, source = _env_value("ANTHROPIC_API_KEY")
+    if not value:
         status = Status.fail if "claude" in config.brain.auto_order else Status.warn
         return Check(
-            "Claude OAuth",
+            "ANTHROPIC_API_KEY",
             status,
-            "~/.claude/.credentials.json not found",
-            "Log in via Claude Code first",
+            "not set",
+            "Export ANTHROPIC_API_KEY in ~/.config/hyprland-agent/env",
         )
-    try:
-        data = json.loads(path.read_text())
-        oauth = data.get("claudeAiOauth", {})
-        token = oauth.get("accessToken", "")
-        expires_ms = oauth.get("expiresAt", 0)
-        if not token:
-            return Check("Claude OAuth", Status.fail, "no accessToken")
-        remaining_s = (expires_ms - time.time() * 1000) / 1000
-        if remaining_s < 60:
-            return Check(
-                "Claude OAuth",
-                Status.warn,
-                "token expires soon or expired — will auto-refresh",
-            )
-        return Check("Claude OAuth", Status.ok, f"valid (expires in {int(remaining_s)}s)")
-    except Exception as exc:
-        return Check("Claude OAuth", Status.fail, str(exc))
+    return Check("ANTHROPIC_API_KEY", Status.ok, f"set in {source}")
 
 
 def _anthropic_model() -> Check:
@@ -339,7 +317,7 @@ def run_all() -> list[Check]:
         _uinput_writable(),
         _hyprland_env(),
         *_brain_config_checks(),
-        _oauth_creds(),
+        _anthropic_key(),
         _anthropic_model(),
         *_provider_checks(),
         _allowlist(),
