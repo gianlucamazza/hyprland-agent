@@ -6,7 +6,6 @@ Built-in: OpenAI, Moonshot Kimi, Groq, Together AI, Z.AI, Qwen (DashScope).
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 from dataclasses import dataclass
@@ -14,16 +13,16 @@ from typing import TYPE_CHECKING, Any
 
 from openai import AsyncOpenAI
 
+from agent.brain._action_map import computer_actions
+from agent.brain._common import MAX_LOOP, SCALE, png_b64
 from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
 
 if TYPE_CHECKING:
     from agent.brain.context import BrainContext
 
-from agent.config import DEFAULT_MAX_ITER
-
-_SCALE = 0.5  # screenshot resize factor; coordinates scaled back up before dispatch
-_MAX_LOOP = DEFAULT_MAX_ITER
+_SCALE = SCALE
+_MAX_LOOP = MAX_LOOP
 
 
 @dataclass(frozen=True)
@@ -261,14 +260,6 @@ _TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def _png_b64(png: bytes) -> str:
-    return base64.standard_b64encode(png).decode()
-
-
-def _sc(val: int | float, factor: float) -> int:
-    return int(val * factor)
-
-
 async def _call_tool(
     name: str, args: dict[str, Any], scale: float = 1.0
 ) -> tuple[str, list[Action]]:
@@ -278,60 +269,27 @@ async def _call_tool(
     """
     if name == "screenshot":
         png = await screen.for_vision(scale=_SCALE)
-        return f"data:image/png;base64,{_png_b64(png)}", [Action(kind=ActionKind.screenshot)]
+        return f"data:image/png;base64,{png_b64(png)}", [Action(kind=ActionKind.screenshot)]
 
-    if name == "left_click":
-        x, y = _sc(args["x"], scale), _sc(args["y"], scale)
-        return f"left_click ({x},{y})", [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "left"}),
-        ]
-
-    if name == "right_click":
-        x, y = _sc(args["x"], scale), _sc(args["y"], scale)
-        return f"right_click ({x},{y})", [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "right"}),
-        ]
-
-    if name == "middle_click":
-        x, y = _sc(args["x"], scale), _sc(args["y"], scale)
-        return f"middle_click ({x},{y})", [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "middle"}),
-        ]
-
-    if name == "double_click":
-        x, y = _sc(args["x"], scale), _sc(args["y"], scale)
-        return f"double_click ({x},{y})", [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "left"}),
-            Action(kind=ActionKind.click, params={"button": "left"}),
-        ]
-
-    if name == "scroll":
-        x, y = _sc(args["x"], scale), _sc(args["y"], scale)
-        direction = args.get("direction", "down")
-        amount = int(args.get("amount", 3))
-        signed = -amount if direction in ("up", "left") else amount
-        horizontal = direction in ("left", "right")
-        return f"scroll {direction}×{amount} at ({x},{y})", [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(
-                kind=ActionKind.scroll,
-                params={"amount": signed, "horizontal": horizontal},
-            ),
-        ]
-
-    if name == "type_text":
-        text = args["text"]
-        return f"typed {len(text)} chars", [
-            Action(kind=ActionKind.type_text, params={"text": text})
-        ]
-
-    if name == "key":
-        combo = args["combo"]
-        return f"pressed {combo}", [Action(kind=ActionKind.key, params={"combo": combo})]
+    # Common computer-use verbs delegated to shared action map
+    acts = computer_actions(
+        name,
+        x=args.get("x", 0),
+        y=args.get("y", 0),
+        text=args.get("text", ""),
+        combo=args.get("combo", ""),
+        direction=args.get("direction", "down"),
+        amount=args.get("amount", 3),
+        scale_x=scale,
+        scale_y=scale,
+    )
+    if acts:
+        if "x" in args and "y" in args:
+            sx, sy = int(args["x"] * scale), int(args["y"] * scale)
+            label = f"{name} ({sx},{sy})"
+        else:
+            label = name
+        return label, acts
 
     if name == "terminal_command":
         command = args["command"]
@@ -383,7 +341,7 @@ class OpenAICompatibleBrain:
                 "content": [
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{_png_b64(png)}"},
+                        "image_url": {"url": f"data:image/png;base64,{png_b64(png)}"},
                     },
                     {"type": "text", "text": user_text},
                 ],

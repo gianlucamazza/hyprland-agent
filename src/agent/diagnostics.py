@@ -216,8 +216,7 @@ def _provider_checks() -> list[Check]:
             )
         ]
     out: list[Check] = []
-    for cfg in PROVIDERS.values():
-        provider_key = next(key for key, item in PROVIDERS.items() if item == cfg)
+    for provider_key, cfg in PROVIDERS.items():
         if not config.brain.is_enabled(provider_key):
             out.append(Check(cfg.key_env, Status.warn, "disabled by provider config"))
             continue

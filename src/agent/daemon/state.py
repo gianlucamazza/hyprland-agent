@@ -41,14 +41,26 @@ class AppState:
         cfg = self.config.integrations
         enabled = cfg.enabled if cfg.enabled else None
         await self.integrations.load(self, enabled=enabled)
+        from agent.daemon.watcher_service import load_rules
+
+        self.rules = await load_rules()
         if self.config.memory.enabled:
             self.learning = LearningConsumer(self.pubsub, self.episodic, self.reflection)
             await self.learning.open()
 
-    async def close(self) -> None:
+    async def close(self, executor_timeout: float = 5.0) -> None:
         await self.integrations.teardown()
         if self.learning is not None:
             await self.learning.close()
-        await self.executor.close()
+        import asyncio
+
+        try:
+            await asyncio.wait_for(self.executor.close(), timeout=executor_timeout)
+        except TimeoutError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Some runs did not finish within %.1fs grace period", executor_timeout
+            )
         await self.audit.close()
         await self.store.close()

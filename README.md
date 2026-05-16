@@ -170,13 +170,14 @@ OpenAI or another configured provider.
 | Role             | Provider                      |                        Brain option | Default model       |
 | ---------------- | ----------------------------- | ----------------------------------: | ------------------- |
 | Primary          | Anthropic Claude computer-use |                    `--brain claude` | `claude-opus-4-7`   |
-| Claude fallback  | Anthropic Claude computer-use | `ANTHROPIC_MODEL=claude-sonnet-4-6` | `claude-sonnet-4-6` |
 | Premium fallback | OpenAI vision/tool calling    |                    `--brain openai` | `gpt-5.2`           |
 | Economy fallback | Moonshot Kimi                 |                      `--brain kimi` | `kimi-k2.6`         |
 | Experimental     | Groq                          |                      `--brain groq` | see `.env.example`  |
 | Experimental     | Together AI                   |                  `--brain together` | see `.env.example`  |
 | Experimental     | Z.AI / GLM                    |      `--brain zai` or `--brain glm` | see `.env.example`  |
 | Experimental     | Qwen / DashScope              |                      `--brain qwen` | see `.env.example`  |
+
+Override the Claude model with `ANTHROPIC_MODEL` (e.g. `claude-sonnet-4-6`); see [Credentials](#credentials).
 
 Avoid routed or aggregate providers as the default desktop-control brain.
 Desktop screenshots are sensitive, and action reliability matters more than
@@ -345,7 +346,7 @@ agent service install          # install systemd user unit
 agent service uninstall        # remove config + cache + systemd unit
 
 # Integrations
-agent-waybar --watch          # stream Waybar JSON to stdout
+agent-waybar                  # stream Waybar JSON to stdout
 fuzzel-agent                  # pick and re-run a recent task via fuzzel
 ```
 
@@ -433,7 +434,7 @@ rules:
 Supported events:
 
 ```text
-openwindow, closewindow, activewindow, workspace, focusedmon, urgent
+openwindow, closewindow, movewindow, activewindow, workspace, focusedmon, urgent
 ```
 
 Supported actions:
@@ -562,42 +563,6 @@ Opt-in JSONL audit logging is available when `audit_log: true` is set in:
   terminal open for a few seconds; normal shell commands close immediately.
 - Do not rely on watch rules for destructive host operations.
 
-## CLI rename history
-
-| Old command             | New command                                                               |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `agent init-allowlist`  | `agent config init-allowlist`                                             |
-| `agent bind-killswitch` | `agent config bind-killswitch`                                            |
-| `agent watch`           | Watcher runs inside the daemon. Use `agent config reload-rules` to reload rules. |
-
-| Old                            | New                                                   |
-| ------------------------------ | ----------------------------------------------------- |
-| `hyprland-agent-watch.service` | `hyprland-agent.service`; run `agent service install` |
-| JSONL as primary storage       | SQLite `runs.db`; JSONL is opt-in audit output        |
-| `RunSummary.dry_run: bool`     | `RunSummary.kind: RunKind` (`run`\|`plan`)            |
-| `agent dry-run`                | `agent plan`                                          |
-
-## Current validation status
-
-The codebase is currently green in this workspace.
-
-Observed on this workspace:
-
-```bash
-uv run pytest
-```
-
-Result:
-
-```text
-396 tests collected
-396 passed
-```
-
-The Textual error-screen snapshot is tracked under `tests/__snapshots__/`.
-If it fails after a TUI change, inspect `snapshot_report.html` before updating
-the snapshot intentionally.
-
 ## Development
 
 ```bash
@@ -605,6 +570,10 @@ uv run pytest
 uv run agent doctor
 uv run agent service start -v
 ```
+
+The Textual error-screen snapshot is tracked under `tests/__snapshots__/`. If it
+fails after a TUI change, inspect `snapshot_report.html` before updating the
+snapshot intentionally.
 
 The development command `uv run agent service start -v` is for foreground debugging.
 The installed service should run through `~/.local/bin/agent`, which must

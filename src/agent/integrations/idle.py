@@ -43,7 +43,7 @@ class IdleIntegration:
         return [
             CapabilitySpec(
                 name="desktop.idle_aware",
-                action_kinds=("update_status",),
+                action_kinds=(),
                 context_keys=("idle_locked",),
             )
         ]

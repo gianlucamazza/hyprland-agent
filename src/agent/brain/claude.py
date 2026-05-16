@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import os
 from typing import TYPE_CHECKING, Any
 
+from agent.brain._action_map import computer_actions
+from agent.brain._common import MAX_LOOP, SCALE, png_b64
 from agent.brain.anthropic_client import anthropic_client
 from agent.schemas import Action, ActionKind, ScreenState
 from agent.tools import hypr, screen
@@ -14,12 +15,10 @@ from agent.tools import hypr, screen
 if TYPE_CHECKING:
     from agent.brain.context import BrainContext
 
-from agent.config import DEFAULT_MAX_ITER
-
 _DEFAULT_MODEL = "claude-opus-4-7"
 _MAX_TOKENS = 4096
-_SCALE = 0.5  # screenshot resize factor; coordinates are scaled back up before dispatch
-_MAX_LOOP = DEFAULT_MAX_ITER
+_SCALE = SCALE
+_MAX_LOOP = MAX_LOOP
 
 _CUSTOM_TOOLS: list[dict[str, Any]] = [
     {
@@ -90,10 +89,6 @@ def _computer_tool(width: int, height: int) -> dict[str, Any]:
     }
 
 
-def _png_b64(png: bytes) -> str:
-    return base64.standard_b64encode(png).decode()
-
-
 async def _handle_custom(name: str, inp: dict[str, Any]) -> tuple[str, list[Action]]:
     if name == "list_windows":
         wins = await hypr.clients()
@@ -123,58 +118,18 @@ async def _handle_custom(name: str, inp: dict[str, Any]) -> tuple[str, list[Acti
 def _computer_action_to_actions(
     action: dict[str, Any], scale_x: float = 1.0, scale_y: float = 1.0
 ) -> list[Action]:
-    def _sc(coord: list) -> tuple[int, int]:
-        return int(coord[0] * scale_x), int(coord[1] * scale_y)
-
-    at = action.get("action")
-    if at == "screenshot":
-        return [Action(kind=ActionKind.screenshot)]
-    if at == "left_click":
-        x, y = _sc(action.get("coordinate", [0, 0]))
-        return [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "left"}),
-        ]
-    if at == "right_click":
-        x, y = _sc(action.get("coordinate", [0, 0]))
-        return [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "right"}),
-        ]
-    if at == "middle_click":
-        x, y = _sc(action.get("coordinate", [0, 0]))
-        return [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "middle"}),
-        ]
-    if at == "double_click":
-        x, y = _sc(action.get("coordinate", [0, 0]))
-        return [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(kind=ActionKind.click, params={"button": "left"}),
-            Action(kind=ActionKind.click, params={"button": "left"}),
-        ]
-    if at == "mouse_move":
-        x, y = _sc(action.get("coordinate", [0, 0]))
-        return [Action(kind=ActionKind.mouse_move, params={"x": x, "y": y})]
-    if at == "type":
-        return [Action(kind=ActionKind.type_text, params={"text": action.get("text", "")})]
-    if at == "key":
-        return [Action(kind=ActionKind.key, params={"combo": action.get("key", "")})]
-    if at == "scroll":
-        x, y = _sc(action.get("coordinate", [0, 0]))
-        direction = action.get("direction", "down")
-        amount = action.get("amount", 3)
-        signed = -amount if direction in ("up", "left") else amount
-        horizontal = direction in ("left", "right")
-        return [
-            Action(kind=ActionKind.mouse_move, params={"x": x, "y": y}),
-            Action(
-                kind=ActionKind.scroll,
-                params={"amount": signed, "horizontal": horizontal},
-            ),
-        ]
-    return []
+    coord = action.get("coordinate", [0, 0])
+    return computer_actions(
+        action.get("action", ""),
+        x=coord[0],
+        y=coord[1],
+        text=action.get("text", ""),
+        combo=action.get("key", ""),
+        direction=action.get("direction", "down"),
+        amount=action.get("amount", 3),
+        scale_x=scale_x,
+        scale_y=scale_y,
+    )
 
 
 class ClaudeBrain:
@@ -205,7 +160,7 @@ class ClaudeBrain:
                         "source": {
                             "type": "base64",
                             "media_type": "image/png",
-                            "data": _png_b64(png),
+                            "data": png_b64(png),
                         },
                     },
                     {"type": "text", "text": user_text},

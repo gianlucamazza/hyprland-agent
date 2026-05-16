@@ -1,6 +1,6 @@
 # Maintainer: Gianluca <homen3@gmail.com>
 pkgname=hyprland-agent
-pkgver=1.1.1
+pkgver=1.2.0
 pkgrel=1
 pkgdesc="Local-first agentic desktop controller for Hyprland / Wayland"
 arch=('any')
@@ -13,9 +13,7 @@ depends=(
     'python-rich'
     'python-typer'
     'python-textual'
-    'python-httpx'
     'python-openai'
-    'python-aiohttp'
     'python-yaml'
     'python-pillow'
     'python-jeepney'
@@ -36,7 +34,7 @@ optdepends=(
     'fuzzel: fuzzel-agent task launcher'
     'foot: terminal emulator used by the hyprland-agent-tui.desktop launcher'
 )
-makedepends=('python-installer' 'python-build' 'uv')
+makedepends=('python-installer' 'uv')
 provides=('hyprland-agent')
 conflicts=('hyprland-agent')
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gianlucamazza/hyprland-agent/archive/refs/tags/v${pkgver}.tar.gz")

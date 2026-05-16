@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
 
+from agent.config import CONFIG_DIR
 from agent.daemon.rule_runner import execute_rule, match_event
 from agent.schemas import Rule
 
@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_RULES_PATH = Path.home() / ".config" / "hyprland-agent" / "rules.yaml"
-_LEARNED_RULES_PATH = Path.home() / ".config" / "hyprland-agent" / "learned_rules.yaml"
+_RULES_PATH = CONFIG_DIR / "rules.yaml"
+_LEARNED_RULES_PATH = CONFIG_DIR / "learned_rules.yaml"
 
 _RULES_TEMPLATE = """\
 # Hyprland Agent — watch rules

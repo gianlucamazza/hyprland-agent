@@ -152,24 +152,9 @@ fi
 # --- Systemd: optional ---
 if [[ -z "$skip_systemd" ]] && command -v systemctl &>/dev/null; then
 	agent_launcher="$bin_dir/agent"
-	cat >"$unit_path" <<UNIT
-[Unit]
-Description=Hyprland agent daemon
-After=graphical-session.target
-PartOf=graphical-session.target
-ConditionEnvironment=HYPRLAND_INSTANCE_SIGNATURE
-
-[Service]
-Type=simple
-ExecStart=$agent_launcher service start
-Restart=on-failure
-RestartSec=5
-Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin
-EnvironmentFile=-%h/.config/hyprland-agent/env
-
-[Install]
-WantedBy=graphical-session.target
-UNIT
+	service_template="$repo_root/packaging/systemd/hyprland-agent.service"
+	sed "s|%h/.local/bin/agent service start|$agent_launcher service start|g; s|%h|${HOME}|g" \
+		"$service_template" >"$unit_path"
 	systemctl --user daemon-reload
 	systemctl --user enable hyprland-agent.service
 	systemctl --user restart hyprland-agent.service

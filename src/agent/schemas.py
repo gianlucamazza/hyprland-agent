@@ -85,8 +85,6 @@ class ActionKind(StrEnum):
     scroll = "scroll"
     focus_window = "focus_window"
     dispatch = "dispatch"
-    clipboard_copy = "clipboard_copy"
-    clipboard_paste = "clipboard_paste"
     # Integration-provided kinds
     notify = "notify"
     update_status = "update_status"

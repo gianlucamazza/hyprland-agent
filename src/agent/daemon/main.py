@@ -9,7 +9,7 @@ from pathlib import Path
 
 from agent.daemon.server import serve
 from agent.daemon.state import AppState
-from agent.daemon.watcher_service import load_rules, run_watcher
+from agent.daemon.watcher_service import run_watcher
 from agent.ipc.constants import SOCKET_PATH
 from agent.safety import killswitch
 
@@ -47,8 +47,6 @@ async def run(socket_path: Path = SOCKET_PATH) -> None:
 
     _install_log(state.pubsub, asyncio.get_running_loop())
 
-    state.rules = await load_rules()
-
     shutdown = asyncio.Event()
     loop = asyncio.get_running_loop()
 
@@ -72,11 +70,6 @@ async def run(socket_path: Path = SOCKET_PATH) -> None:
     # Cancel active runs gracefully
     for run_id in await state.executor.active_run_ids():
         await state.executor.cancel(run_id)
-
-    try:
-        await asyncio.wait_for(state.executor.close(), timeout=5.0)
-    except TimeoutError:
-        log.warning("Some runs did not finish within grace period")
 
     for task in (server_task, watcher_task, poller_task):
         task.cancel()

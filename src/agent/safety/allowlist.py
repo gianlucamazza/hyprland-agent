@@ -5,13 +5,13 @@ from __future__ import annotations
 import fnmatch
 import threading
 from collections import Counter
-from pathlib import Path
 
 import yaml
 
+from agent.config import CONFIG_DIR
 from agent.schemas import Window
 
-_CONFIG_PATH = Path.home() / ".config" / "hyprland-agent" / "allowlist.yaml"
+_CONFIG_PATH = CONFIG_DIR / "allowlist.yaml"
 
 # Classes always blocked regardless of allowlist
 _ALWAYS_DENY = {"1password", "_1password", "keepassxc", "gnome-keyring"}

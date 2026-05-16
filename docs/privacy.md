@@ -23,7 +23,7 @@ On every action step, the following is transmitted to the configured LLM provide
 | Groq | `GROQ_API_KEY` | [Groq Privacy Policy](https://groq.com/privacy-policy/) |
 | Together AI | `TOGETHER_API_KEY` | [Together Privacy Policy](https://www.together.ai/privacy) |
 | Moonshot | `MOONSHOT_API_KEY` | Provider policy applies |
-| ZAI / Qwen | `ZAI_API_KEY` / `QWEN_API_KEY` | Provider policy applies |
+| ZAI / Qwen | `ZAI_API_KEY` / `DASHSCOPE_API_KEY` | Provider policy applies |
 
 **Provider API keys are stored in `~/.config/hyprland-agent/env` and read only by the daemon process. They never cross the IPC socket.**
 

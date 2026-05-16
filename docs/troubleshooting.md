@@ -29,25 +29,16 @@
 
 **Symptom**: mouse/keyboard actions fail with "permission denied" or `/dev/uinput` errors.
 
-1. **Not in `input` group**:
-   ```bash
-   groups | grep input   # must show "input"
-   sudo usermod -aG input $USER
-   # Then re-login (or use: newgrp input in the current shell)
-   ```
+See [Prerequisites → ydotool daemon](../README.md#ydotool-daemon) for the full setup
+(`input` group, udev rule, `ydotool.service`).
 
-2. **udev rule missing** (non-Arch distros):
-   ```bash
-   echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' | \
-       sudo tee /etc/udev/rules.d/80-uinput.rules
-   sudo udevadm control --reload-rules && sudo udevadm trigger
-   ```
+Quick checks:
 
-3. **ydotoold not running**:
-   ```bash
-   systemctl --user enable --now ydotool.service
-   agent doctor   # shows ydotoold status
-   ```
+```bash
+groups | grep input                              # must show "input"
+systemctl --user enable --now ydotool.service
+agent doctor                                     # shows ydotoold status
+```
 
 ---
 

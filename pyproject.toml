@@ -1,6 +1,6 @@
 [project]
 name = "hyprland-agent"
-version = "1.1.1"
+version = "1.2.0"
 description = "Local-first agentic desktop controller for Hyprland / Wayland"
 readme = "README.md"
 license = "Apache-2.0"
@@ -39,6 +39,7 @@ dependencies = [
   "fastembed>=0.4",
   "sqlite-vec>=0.1.6,<0.2",
   "jeepney>=0.8",
+  "rich>=13",
 ]
 
 [project.urls]

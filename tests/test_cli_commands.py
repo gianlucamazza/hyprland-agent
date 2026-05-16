@@ -47,7 +47,11 @@ def test_cmd_status_no_daemon():
 
 def test_cmd_stop_with_yes(tmp_path):
     flag = tmp_path / "STOP"
-    with patch("agent.safety.killswitch._FLAG", flag), patch("asyncio.run"):
+
+    def _consume(coro):
+        coro.close()
+
+    with patch("agent.safety.killswitch._FLAG", flag), patch("asyncio.run", side_effect=_consume):
         result = runner.invoke(app, ["stop", "--yes"])
     assert result.exit_code == 0
     assert flag.exists()

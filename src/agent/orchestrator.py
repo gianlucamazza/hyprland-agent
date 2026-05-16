@@ -157,18 +157,6 @@ async def _execute_action(
         response = await hypr.dispatch(cmd)
         return ActionResult(kind=k.value, dispatch_response=response)
 
-    if k == ActionKind.clipboard_copy:
-        from agent.tools import clipboard
-
-        await clipboard.write(p["text"])
-        return base
-
-    if k == ActionKind.clipboard_paste:
-        if not await _ensure_keyboard_target_is_safe(ctx):
-            return ActionResult(kind=k.value, blocked="control_terminal")
-        await inp.key("ctrl+v")
-        return base
-
     if k in (ActionKind.notify, ActionKind.update_status):
         if app_state is not None:
             result = await app_state.integrations.handle(action)

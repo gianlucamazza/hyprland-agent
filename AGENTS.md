@@ -30,7 +30,7 @@ Hyprland command/event integration uses native Hyprland Unix sockets, not `hyprc
 
 The project uses `pytest`, `pytest-asyncio` in auto mode, and `pytest-textual-snapshot` for TUI snapshots. Add focused tests beside related coverage in `tests/` when changing safety gates, IPC contracts, provider routing, or Hyprland action translation. For TUI changes, update snapshots intentionally and inspect `snapshot_report.html` when a snapshot fails.
 
-The documented current full-suite state is `338 passed`. If `tests/test_tui.py::test_tui_error_screen_snapshot` fails after a TUI change, inspect `snapshot_report.html` and update the snapshot intentionally.
+Run `uv run pytest` and verify all tests pass. If `tests/test_tui.py::test_tui_error_screen_snapshot` fails after a TUI change, inspect `snapshot_report.html` and update the snapshot intentionally.
 
 ## Commit & Pull Request Guidelines
 
@@ -44,4 +44,4 @@ Configuration lives under `~/.config/hyprland-agent/` (`allowlist.yaml`, `rules.
 
 The allowlist is deny-by-default when empty. Password-manager windows such as `1password`, `_1password`, `keepassxc`, and `gnome-keyring` are always blocked regardless of allowlist entries. Rule `run` actions must stay `shlex.split` parsed, constrained to the whitelisted environment, and protected by the destructive first-token deny list.
 
-The orchestrator refuses `type_text`, `key`, and `clipboard_paste` when the focused window hosts a control terminal (codex/claude/agent) to avoid agent feedback loops. Use the `terminal_command` action for foreground shell work; `hold_s` is clamped to 30 s.
+The orchestrator refuses `type_text` and `key` when the focused window hosts a control terminal (codex/claude/agent) to avoid agent feedback loops. Use the `terminal_command` action for foreground shell work; `hold_s` is clamped to 30 s.

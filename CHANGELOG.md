@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-16
+
+### Added
+
+- `src/agent/brain/_common.py` — shared constants (`SCALE`, `MAX_LOOP`) and `png_b64()` helper for brain implementations.
+- `src/agent/brain/_action_map.py` — single source of truth for computer-use verb → `Action` translation (used by both `claude.py` and `openai_brain.py`).
+- `tests/test_brain_action_map.py` — 15 unit tests covering all verbs, coordinate scaling, scroll directions, unknown verbs.
+- `.github/workflows/ci.yml` — new `typecheck` job running `uv run mypy src/agent/`.
+
+### Changed
+
+- `src/agent/brain/claude.py` / `openai_brain.py` — coordinate translation delegated to `_action_map.computer_actions()`. ~140 LOC of duplication removed.
+- `scripts/install-local.sh` — installs systemd unit by `sed`-substituting `packaging/systemd/hyprland-agent.service` instead of duplicating via heredoc. Single source of truth.
+- `src/agent/safety/allowlist.py` — uses `agent.config.CONFIG_DIR` instead of hardcoded `Path.home() / ".config" / ...`.
+- `src/agent/daemon/watcher_service.py` — same `CONFIG_DIR` correction for `rules.yaml` / `learned_rules.yaml`.
+- `src/agent/daemon/state.py` — `load_rules()` now invoked inside `AppState.open()`; `executor.close()` timeout encapsulated in `state.close()`.
+- `pyproject.toml` — `rich>=13` declared as direct dependency (previously transitive via textual/typer).
+- `packaging/aur/PKGBUILD` — removed dead deps (`python-httpx`, `python-aiohttp`, `python-build`); regenerated `.SRCINFO`.
+- `CLAUDE.md` — collapsed ~80 LOC of duplication with `docs/architecture.md`; replaced duplicated sections with links.
+- `tests/test_cli_commands.py` — `test_cmd_stop_with_yes` now consumes the patched coroutine to silence `RuntimeWarning`.
+
+### Removed
+
+- `ActionKind.clipboard_copy` / `ActionKind.clipboard_paste` — abandoned stubs (never emitted, no tests, since initial commit). `tools/clipboard.py` retained as utility.
+
+### Fixed
+
+- `src/agent/integrations/idle.py` — capability mis-declared `action_kinds=("update_status",)`; integration is a D-Bus listener. Corrected to `action_kinds=()`, `context_keys=("idle_locked",)`.
+- `docs/privacy.md` — `QWEN_API_KEY` → `DASHSCOPE_API_KEY` (consistent with `.env.example` and `brain/openai_brain.py`).
+- `docs/troubleshooting.md` — replaced duplicate ydotool setup block with link to `README.md#ydotool-daemon`.
+- `src/agent/diagnostics.py` — `_provider_checks()` iterates `PROVIDERS.items()` directly (removed redundant reverse lookup).
+- `AGENTS.md` / `CLAUDE.md` — removed stale test counts.
+
 ## [1.1.1] - 2026-05-16
 
 ### Fixed
