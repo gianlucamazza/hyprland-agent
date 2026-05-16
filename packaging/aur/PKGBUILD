@@ -1,6 +1,6 @@
 # Maintainer: Gianluca <homen3@gmail.com>
 pkgname=hyprland-agent
-pkgver=1.2.0
+pkgver=1.3.0
 pkgrel=1
 pkgdesc="Local-first agentic desktop controller for Hyprland / Wayland"
 arch=('any')
