@@ -63,8 +63,11 @@ def cmd_show(
 def cmd_approve(
     kind: Annotated[str, typer.Argument(help="skill | rule | allowlist")],
     proposal_id: Annotated[str, typer.Argument(help="Proposal ID")],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Approve a learning proposal."""
+    """Approve a learning proposal (writes to learned_rules.yaml or allowlist.yaml)."""
+    confirm_or_exit(f"Approve {kind} {proposal_id}?", yes)
 
     async def _do() -> None:
         from agent.client.connection import connect
@@ -72,7 +75,10 @@ def cmd_approve(
 
         async with connect(SOCKET_PATH) as c:
             result = await c.request(RpcMethod.learning_approve, {"kind": kind, "id": proposal_id})
-        typer.echo(f"Approved {result.get('kind')} {result.get('id')} → {result.get('status')}")
+        if json_out:
+            typer.echo(json.dumps(result, default=str))
+        else:
+            typer.echo(f"Approved {result.get('kind')} {result.get('id')} → {result.get('status')}")
 
     _run(_do())
 

@@ -74,6 +74,92 @@ def test_cmd_doctor_json_output():
     assert all("name" in c for c in checks)
 
 
+# ── config init-allowlist: --yes skips confirmation on overwrite ─────────────
+
+
+def test_config_init_allowlist_no_overwrite_prompt_when_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with patch("agent.safety.allowlist.create_default_config"):
+        result = runner.invoke(app, ["config", "init-allowlist", "--yes"])
+    assert result.exit_code == 0
+
+
+def test_config_init_allowlist_yes_skips_confirm(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    allowlist = tmp_path / ".config" / "hyprland-agent" / "allowlist.yaml"
+    allowlist.parent.mkdir(parents=True)
+    allowlist.touch()
+    with (
+        patch("agent.config.CONFIG_DIR", allowlist.parent),
+        patch("agent.safety.allowlist.create_default_config"),
+    ):
+        result = runner.invoke(app, ["config", "init-allowlist", "--yes"])
+    assert result.exit_code == 0
+
+
+# ── config bind-killswitch: --yes + --force ───────────────────────────────────
+
+
+def test_config_bind_killswitch_yes(tmp_path):
+    conf = tmp_path / "hyprland.conf"
+    conf.write_text("# existing config\n")
+    with (
+        patch("agent.cli.config.HYPR_CONF_PATH", conf),
+        patch("agent.cli.config.resolve_agent_bin", return_value="/usr/bin/agent"),
+    ):
+        result = runner.invoke(app, ["config", "bind-killswitch", "--yes"])
+    assert result.exit_code == 0
+    assert "agent stop" in conf.read_text()
+
+
+def test_config_bind_killswitch_idempotent_without_force(tmp_path):
+    conf = tmp_path / "hyprland.conf"
+    conf.write_text("bind = SUPER SHIFT, escape, exec, /usr/bin/agent stop\n")
+    with patch("agent.cli.config.HYPR_CONF_PATH", conf):
+        result = runner.invoke(app, ["config", "bind-killswitch", "--yes"])
+    assert result.exit_code == 0
+    assert "already present" in result.output
+
+
+def test_config_bind_killswitch_force_rewrites(tmp_path):
+    conf = tmp_path / "hyprland.conf"
+    conf.write_text("bind = SUPER SHIFT, escape, exec, /old/agent stop\n")
+    with (
+        patch("agent.cli.config.HYPR_CONF_PATH", conf),
+        patch("agent.cli.config.resolve_agent_bin", return_value="/new/agent"),
+    ):
+        result = runner.invoke(app, ["config", "bind-killswitch", "--yes", "--force"])
+    assert result.exit_code == 0
+    text = conf.read_text()
+    assert "/new/agent stop" in text
+
+
+# ── service install: --dry-run + --yes ────────────────────────────────────────
+
+
+def test_service_install_dry_run(tmp_path):
+    with (
+        patch("agent.cli.service.SYSTEMD_USER_DIR", tmp_path),
+        patch("agent.cli.service.resolve_agent_bin", return_value="/usr/bin/agent"),
+    ):
+        result = runner.invoke(app, ["service", "install", "--dry-run"])
+    assert result.exit_code == 0
+    assert "Would write" in result.output
+    assert "daemon-reload" in result.output
+    assert not (tmp_path / "hyprland-agent.service").exists()
+
+
+def test_service_install_yes(tmp_path):
+    with (
+        patch("agent.cli.service.SYSTEMD_USER_DIR", tmp_path),
+        patch("agent.cli.service.resolve_agent_bin", return_value="/usr/bin/agent"),
+        patch("subprocess.run"),
+    ):
+        result = runner.invoke(app, ["service", "install", "--yes"])
+    assert result.exit_code == 0
+    assert (tmp_path / "hyprland-agent.service").exists()
+
+
 # ── service uninstall: nothing to remove path ─────────────────────────────────
 
 

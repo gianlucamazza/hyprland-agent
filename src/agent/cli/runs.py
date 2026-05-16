@@ -82,6 +82,7 @@ def cmd_show(
 def cmd_cancel(
     run_id: Annotated[str, typer.Argument(help="Run ID to cancel")],
     yes: Annotated[bool, typer.Option("--yes", help="Skip confirmation")] = False,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Cancel a specific run (does not arm the global kill switch)."""
     confirm_or_exit(f"Cancel run {run_id[:8]}?", yes)
@@ -93,7 +94,9 @@ def cmd_cancel(
         async with connect(SOCKET_PATH) as c:
             result = await c.request(RpcMethod.cancel_run, {"run_id": run_id})
         ok = result.get("ok", False)
-        if ok:
+        if json_out:
+            typer.echo(json.dumps({"ok": ok, "run_id": run_id}))
+        elif ok:
             typer.echo(f"Cancelled {run_id[:8]}")
         else:
             typer.echo(f"Run {run_id[:8]} not found or already finished.", err=True)
@@ -165,6 +168,7 @@ def cmd_feedback(
     up: Annotated[bool, typer.Option("--up", help="Thumbs up (success)")] = False,
     down: Annotated[bool, typer.Option("--down", help="Thumbs down (failure)")] = False,
     comment: Annotated[str | None, typer.Option("--comment", "-c", help="Free-text note")] = None,
+    json_out: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
     """Record explicit feedback for a run."""
     if not up and not down and not comment:
@@ -181,9 +185,12 @@ def cmd_feedback(
                 RpcMethod.record_feedback,
                 {"run_id": run_id, "kind": kind, "comment": comment},
             )
-        typer.echo(
-            f"outcome={result.get('outcome', '?')}  feedback_id={result.get('feedback_id', '?')}"
-        )
+        if json_out:
+            typer.echo(json.dumps(result, default=str))
+        else:
+            typer.echo(
+                f"outcome={result.get('outcome', '?')}  feedback_id={result.get('feedback_id', '?')}"
+            )
 
     _run(_do())
 

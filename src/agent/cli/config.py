@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 
-from agent.cli._common import ExitCode, _run
+from agent.cli._common import ExitCode, _run, confirm_or_exit
 from agent.ipc.constants import SOCKET_PATH
 from agent.paths import HYPR_CONF_PATH, resolve_agent_bin
 
@@ -14,17 +14,30 @@ config_app = typer.Typer(help="Configuration (no daemon required for most comman
 
 
 @config_app.command("init-allowlist")
-def cmd_init_allowlist() -> None:
+def cmd_init_allowlist(
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+) -> None:
     """Create default allowlist config at ~/.config/hyprland-agent/allowlist.yaml."""
+    from agent.config import CONFIG_DIR
     from agent.safety.allowlist import create_default_config
 
+    if (CONFIG_DIR / "allowlist.yaml").exists():
+        confirm_or_exit("Overwrite existing allowlist.yaml?", yes)
     create_default_config()
     typer.echo("Created ~/.config/hyprland-agent/allowlist.yaml")
     typer.echo("Edit it to allow the windows the agent should be able to control.")
 
 
 @config_app.command("bind-killswitch")
-def cmd_bind_killswitch() -> None:
+def cmd_bind_killswitch(
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force", help="Rewrite bind even if already present (e.g. bin path changed)"
+        ),
+    ] = False,
+) -> None:
     """Append SUPER+SHIFT+ESC kill-switch bind to ~/.config/hypr/hyprland.conf."""
     conf = HYPR_CONF_PATH
     if not conf.exists():
@@ -35,10 +48,11 @@ def cmd_bind_killswitch() -> None:
     bind_line = f"bind = SUPER SHIFT, escape, exec, {agent_bin} stop"
 
     text = conf.read_text()
-    if "agent stop" in text:
+    if "agent stop" in text and not force:
         typer.echo("Kill-switch bind already present in hyprland.conf.")
         return
 
+    confirm_or_exit(f"Append kill-switch bind to {conf}?", yes)
     with open(conf, "a") as f:
         f.write(f"\n# Hyprland agent kill switch (SUPER+SHIFT+ESC)\n{bind_line}\n")
 

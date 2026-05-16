@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from agent.cli._common import _setup_logging
+from agent.cli._common import _setup_logging, confirm_or_exit
 from agent.paths import SERVICE_UNIT_NAME, SYSTEMD_USER_DIR, resolve_agent_bin
 
 service_app = typer.Typer(help="Daemon lifecycle (start, install systemd unit)")
@@ -38,7 +38,15 @@ def cmd_start(
 
 
 @service_app.command("install")
-def cmd_install() -> None:
+def cmd_install(
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", help="Print unit content and systemctl commands without executing"
+        ),
+    ] = False,
+) -> None:
     """Install (or upgrade) the hyprland-agent.service systemd user unit."""
     import subprocess
     from pathlib import Path
@@ -47,13 +55,6 @@ def cmd_install() -> None:
     systemd_dir = SYSTEMD_USER_DIR
     old_path = systemd_dir / old_unit
     new_path = systemd_dir / SERVICE_UNIT_NAME
-
-    if old_path.exists():
-        typer.echo(f"Stopping {old_unit}…")
-        subprocess.run(["systemctl", "--user", "stop", old_unit], check=False)
-        subprocess.run(["systemctl", "--user", "disable", old_unit], check=False)
-        old_path.unlink()
-        typer.echo(f"Removed {old_path}")
 
     agent_bin = resolve_agent_bin()
     unit_content = f"""[Unit]
@@ -73,6 +74,24 @@ EnvironmentFile=-%h/.config/hyprland-agent/env
 [Install]
 WantedBy=graphical-session.target
 """
+
+    if dry_run:
+        typer.echo(f"# Would write to {new_path}:")
+        typer.echo(unit_content)
+        typer.echo("# Would run:")
+        typer.echo("  systemctl --user daemon-reload")
+        typer.echo(f"  systemctl --user enable --now {SERVICE_UNIT_NAME}")
+        return
+
+    confirm_or_exit(f"Install/upgrade {SERVICE_UNIT_NAME}?", yes)
+
+    if old_path.exists():
+        typer.echo(f"Stopping {old_unit}…")
+        subprocess.run(["systemctl", "--user", "stop", old_unit], check=False)
+        subprocess.run(["systemctl", "--user", "disable", old_unit], check=False)
+        old_path.unlink()
+        typer.echo(f"Removed {old_path}")
+
     systemd_dir.mkdir(parents=True, exist_ok=True)
     new_path.write_text(unit_content)
     typer.echo(f"Wrote {new_path}")
