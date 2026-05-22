@@ -58,7 +58,7 @@ fuzzel-agent = "agent.cli.fuzzel_launcher:main"
 voice = [
   "sounddevice>=0.4,<1",
   "faster-whisper>=1.1,<2",
-  "silero-vad>=5.1,<6",
+  "silero-vad>=5.1,<7",
 ]
 
 [project.entry-points."hyprland_agent.integrations"]
